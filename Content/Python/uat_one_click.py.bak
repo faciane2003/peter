@@ -1,0 +1,158 @@
+import unreal
+import json
+import os
+import time
+
+# ----------------------------
+# Config
+# ----------------------------
+DELTA_X_CM = 100.0
+DUPLICATE_UP_FEET = 10.0
+TAG_TO_ADD = "AUTO_EDIT"
+
+# ----------------------------
+# Helpers
+# ----------------------------
+def ts():
+    return time.strftime("%Y%m%d_%H%M%S")
+
+def automation_dir():
+    d = os.path.join(unreal.Paths.project_saved_dir(), "Automation")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+def log(msg):
+    unreal.log(f"[UAT] {msg}")
+
+def export_selected_to_json(path):
+    actors = list(unreal.EditorLevelLibrary.get_selected_level_actors() or [])
+    if not actors:
+        unreal.log_error("[UAT] No actors selected.")
+        return None
+
+    data = {
+        "timestamp": ts(),
+        "map": unreal.EditorLevelLibrary.get_editor_world().get_path_name(),
+        "actors": []
+    }
+
+    for a in actors:
+        t = a.get_actor_transform()
+        loc = t.translation
+        rot = t.rotation.rotator()
+        scl = t.scale3d
+
+        data["actors"].append({
+            "id": a.get_path_name(),
+            "label": a.get_actor_label(),
+            "class": a.get_class().get_path_name(),
+            "transform": {
+                "location": {"x": loc.x, "y": loc.y, "z": loc.z},
+                "rotation": {"pitch": rot.pitch, "yaw": rot.yaw, "roll": rot.roll},
+                "scale": {"x": scl.x, "y": scl.y, "z": scl.z},
+            },
+            "tags": [str(tag) for tag in a.tags],
+        })
+
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+
+    log(f"Exported {len(data['actors'])} actor(s) -> {path}")
+    return data
+
+def write_modified_json(export_data, path):
+    # Modify in-memory export_data and write to modified.json
+    for a in export_data.get("actors", []):
+        loc = a["transform"]["location"]
+        loc["x"] = float(loc.get("x", 0.0)) + DELTA_X_CM
+
+        tags = a.get("tags") or []
+        if TAG_TO_ADD not in tags:
+            tags.append(TAG_TO_ADD)
+        a["tags"] = tags
+
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(export_data, f, indent=2)
+
+    log(f"Wrote modified JSON -> {path}")
+
+def apply_from_json(path):
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    world_actors = unreal.EditorLevelLibrary.get_all_level_actors()
+    lookup = {a.get_path_name(): a for a in world_actors}
+
+    applied = 0
+    missing = 0
+
+    for entry in data.get("actors", []):
+        actor = lookup.get(entry.get("id"))
+        if not actor:
+            missing += 1
+            continue
+
+        tr = entry.get("transform", {})
+        loc = tr.get("location", {})
+        rot = tr.get("rotation", {})
+        scl = tr.get("scale", {})
+
+        actor.set_actor_location(
+            unreal.Vector(float(loc.get("x", 0)), float(loc.get("y", 0)), float(loc.get("z", 0))),
+            sweep=False,
+            teleport=True
+        )
+        actor.set_actor_rotation(
+            unreal.Rotator(float(rot.get("pitch", 0)), float(rot.get("yaw", 0)), float(rot.get("roll", 0))),
+            teleport_physics=True
+        )
+        actor.set_actor_scale3d(
+            unreal.Vector(float(scl.get("x", 1)), float(scl.get("y", 1)), float(scl.get("z", 1)))
+        )
+
+        actor.tags = [unreal.Name(t) for t in (entry.get("tags") or [])]
+        applied += 1
+
+    log(f"Apply complete. applied={applied} missing={missing}")
+
+def duplicate_selected_and_move_up(feet):
+    cm = float(feet) * 30.48
+    actor_sub = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
+    selected = list(actor_sub.get_selected_level_actors() or [])
+    if not selected:
+        unreal.log_error("[UAT] No actors selected to duplicate.")
+        return []
+
+    new_actors = []
+    for a in selected:
+        dup = actor_sub.duplicate_actor(a)
+        if not dup:
+            continue
+        loc = dup.get_actor_location()
+        loc.z += cm
+        dup.set_actor_location(loc, sweep=False, teleport=True)
+        new_actors.append(dup)
+
+    log(f"Duplicated {len(new_actors)} actor(s) and moved up {cm} cm ({feet} ft).")
+    return new_actors
+
+# ----------------------------
+# One-click main
+# ----------------------------
+def main():
+    out = automation_dir()
+    export_path = os.path.join(out, f"export_{ts()}.json")
+    modified_path = os.path.join(out, "modified.json")
+
+    export_data = export_selected_to_json(export_path)
+    if not export_data:
+        return
+
+    write_modified_json(export_data, modified_path)
+    apply_from_json(modified_path)
+    duplicate_selected_and_move_up(DUPLICATE_UP_FEET)
+
+    log("Done: export -> modify -> apply -> duplicate+moveup")
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,25 @@
+# Unreal Engine
+Saved/
+Intermediate/
+DerivedDataCache/
+Binaries/
+.vs/
+
+# Logs and autosaves
+*.log
+*.tmp
+*.sln
+*.suo
+*.opensdf
+*.sdf
+*.VC.db
+*.VC.VC.opendb
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# OS/editor
+.DS_Store
+Thumbs.db
