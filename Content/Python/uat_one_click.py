@@ -3,6 +3,7 @@ import json
 import os
 import time
 import random
+import math
 
 # ============================================================
 # CONFIG
@@ -14,9 +15,10 @@ TAG_TO_ADD = "AUTO_EDIT"
 BLUE_NAME = "M_UAT_Blue"
 RED_NAME  = "M_UAT_Red"
 MATERIAL_PATH = "/Game/UAT_Materials"
-SPHERE_MESH_PATH = "/Engine/BasicShapes/Sphere.Sphere"
 CONVERT_TO_SPHERE = True
 PLANE_MESH_PATH = "/Engine/BasicShapes/Plane.Plane"
+SPHERE_MESH_PATH = "/Engine/BasicShapes/Sphere.Sphere"
+CUBE_MESH_PATH = "/Engine/BasicShapes/Cube.Cube"
 
 CREATE_TRIANGLES = True
 TRIANGLE_COUNT = 20
@@ -29,9 +31,26 @@ GRASS_COLS = 12
 GRASS_SPACING_CM = 80.0
 GRASS_BLADE_SCALE = 0.25
 
+CREATE_SPHERE_CIRCLE = True
+SPHERE_COUNT = 30
+SPHERE_RADIUS_CM = 400.0
+SPHERE_SCALE = 0.6
+
+CREATE_ROTATING_CUBE = False
+
+# Quick command override (set to None to use normal flow)
+COMMAND = "add_three_cones"
+CUBE_SCALE = 3.0
+CUBE_ROTATION_RATE = unreal.Rotator(0.0, 45.0, 0.0)
+CUBE_ROTATE_IN_EDITOR = True
+CUBE_ROTATE_DEG_PER_SEC = 45.0
+
 # ============================================================
 # HELPERS
 # ============================================================
+_rotating_cube = None
+_rotate_tick_handle = None
+
 def ts():
     return time.strftime("%Y%m%d_%H%M%S")
 
@@ -45,6 +64,26 @@ def automation_dir():
 
 def actor_sub():
     return unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
+
+def _stop_rotate_tick():
+    global _rotate_tick_handle
+    if _rotate_tick_handle is not None:
+        unreal.unregister_slate_post_tick_callback(_rotate_tick_handle)
+        _rotate_tick_handle = None
+
+def _rotate_tick(delta_seconds):
+    global _rotating_cube
+    if not _rotating_cube:
+        _stop_rotate_tick()
+        return
+    if not unreal.SystemLibrary.is_valid(_rotating_cube):
+        _rotating_cube = None
+        _stop_rotate_tick()
+        return
+
+    rot = _rotating_cube.get_actor_rotation()
+    rot.yaw += CUBE_ROTATE_DEG_PER_SEC * delta_seconds
+    _rotating_cube.set_actor_rotation(rot, teleport_physics=True)
 
 # ============================================================
 # MATERIALS (STABLE UE5 IMPLEMENTATION)
@@ -148,15 +187,58 @@ def spawn_grass_field(center, material=None):
             actor.set_actor_rotation(unreal.Rotator(pitch, yaw, 0.0), teleport_physics=True)
             actor.set_actor_scale3d(unreal.Vector(GRASS_BLADE_SCALE, GRASS_BLADE_SCALE, GRASS_BLADE_SCALE))
 
+def spawn_sphere_circle(center):
+    sphere = unreal.EditorAssetLibrary.load_asset(SPHERE_MESH_PATH)
+    if not sphere:
+        unreal.log_error(f"[UAT] Sphere mesh not found: {SPHERE_MESH_PATH}")
+        return
+
+    for i in range(SPHERE_COUNT):
+        angle = (i / float(SPHERE_COUNT)) * 360.0
+        rad = math.radians(angle)
+        loc = unreal.Vector(
+            center.x + math.cos(rad) * SPHERE_RADIUS_CM,
+            center.y + math.sin(rad) * SPHERE_RADIUS_CM,
+            center.z
+        )
+        actor = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.StaticMeshActor, loc)
+        comp = actor.get_component_by_class(unreal.StaticMeshComponent)
+        comp.set_static_mesh(sphere)
+        actor.set_actor_scale3d(unreal.Vector(SPHERE_SCALE, SPHERE_SCALE, SPHERE_SCALE))
+
+def spawn_rotating_cube(center):
+    global _rotating_cube, _rotate_tick_handle
+    cube = unreal.EditorAssetLibrary.load_asset(CUBE_MESH_PATH)
+    if not cube:
+        unreal.log_error(f"[UAT] Cube mesh not found: {CUBE_MESH_PATH}")
+        return
+
+    actor = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.StaticMeshActor, center)
+    comp = actor.get_component_by_class(unreal.StaticMeshComponent)
+    comp.set_static_mesh(cube)
+    actor.set_actor_scale3d(unreal.Vector(CUBE_SCALE, CUBE_SCALE, CUBE_SCALE))
+
+    _rotating_cube = actor
+
+    if CUBE_ROTATE_IN_EDITOR and _rotate_tick_handle is None:
+        _rotate_tick_handle = unreal.register_slate_post_tick_callback(_rotate_tick)
+
+def spawn_three_cones(center, spacing_cm=200.0):
+    cone = unreal.EditorAssetLibrary.load_asset("/Engine/BasicShapes/Cone.Cone")
+    if not cone:
+        unreal.log_error("[UAT] Cone mesh not found: /Engine/BasicShapes/Cone.Cone")
+        return
+
+    for i in range(3):
+        loc = unreal.Vector(center.x + (i * spacing_cm), center.y, center.z)
+        actor = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.StaticMeshActor, loc)
+        comp = actor.get_component_by_class(unreal.StaticMeshComponent)
+        comp.set_static_mesh(cone)
+
 # ============================================================
 # EXPORT
 # ============================================================
-def export_selected():
-    selected = list(actor_sub().get_selected_level_actors() or [])
-    if not selected:
-        unreal.log_error("[UAT] No actors selected.")
-        return None, None
-
+def export_selected(selected):
     data = {
         "timestamp": ts(),
         "actors": []
@@ -182,17 +264,22 @@ def export_selected():
         json.dump(data, f, indent=2)
 
     log(f"Exported {len(data['actors'])} actor(s)")
-    return data, selected
+    return data
 
 # ============================================================
 # MAIN
 # ============================================================
 def main():
-    export_data, selected = export_selected()
-    if not export_data:
+    selected = list(actor_sub().get_selected_level_actors() or [])
+    export_data = export_selected(selected) if selected else None
+    center = selected[0].get_actor_location() if selected else unreal.Vector(0.0, 0.0, 0.0)
+
+    if COMMAND == "add_three_cones":
+        spawn_three_cones(center)
+        log("Added three cones")
         return
 
-    if CONVERT_TO_SPHERE:
+    if selected and CONVERT_TO_SPHERE:
         sphere = unreal.EditorAssetLibrary.load_asset(SPHERE_MESH_PATH)
         if not sphere:
             unreal.log_error(f"[UAT] Sphere mesh not found: {SPHERE_MESH_PATH}")
@@ -220,31 +307,39 @@ def main():
     )
 
     # ---- Move + tag + BLUE original ----
-    for actor in selected:
-        loc = actor.get_actor_location()
-        loc.x += DELTA_X_CM
-        actor.set_actor_location(loc, sweep=False, teleport=True)
+    if selected:
+        # ---- Move + tag + BLUE original ----
+        for actor in selected:
+            loc = actor.get_actor_location()
+            loc.x += DELTA_X_CM
+            actor.set_actor_location(loc, sweep=False, teleport=True)
 
-        tags = [str(t) for t in (actor.tags or [])]
-        if TAG_TO_ADD not in tags:
-            tags.append(TAG_TO_ADD)
-        actor.tags = [unreal.Name(t) for t in tags]
+            tags = [str(t) for t in (actor.tags or [])]
+            if TAG_TO_ADD not in tags:
+                tags.append(TAG_TO_ADD)
+            actor.tags = [unreal.Name(t) for t in tags]
 
-        set_actor_material(actor, blue_mat)
+            set_actor_material(actor, blue_mat)
 
-    # ---- Duplicate + move up + RED ----
-    cm = DUPLICATE_UP_FEET * 30.48
-    for actor in selected:
-        dup = actor_sub().duplicate_actor(actor)
-        if not dup:
-            continue
+        # ---- Duplicate + move up + RED ----
+        cm = DUPLICATE_UP_FEET * 30.48
+        for actor in selected:
+            dup = actor_sub().duplicate_actor(actor)
+            if not dup:
+                continue
 
-        loc = dup.get_actor_location()
-        loc.z += cm
-        dup.set_actor_location(loc, sweep=False, teleport=True)
-        set_actor_material(dup, red_mat)
+            loc = dup.get_actor_location()
+            loc.z += cm
+            dup.set_actor_location(loc, sweep=False, teleport=True)
+            set_actor_material(dup, red_mat)
 
-    center = selected[0].get_actor_location()
+    if CREATE_SPHERE_CIRCLE:
+        spawn_sphere_circle(center)
+        log(f"Spawned {SPHERE_COUNT} spheres in a circle")
+
+    if CREATE_ROTATING_CUBE:
+        spawn_rotating_cube(center)
+        log("Spawned rotating cube at center")
 
     if CREATE_TRIANGLES:
         for _ in range(TRIANGLE_COUNT):

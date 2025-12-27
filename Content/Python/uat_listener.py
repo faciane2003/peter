@@ -52,7 +52,15 @@ def _handle_message(msg):
             return
         if "command" in payload:
             _log("Running python command")
-            unreal.execute_python_command(payload["command"])
+            cmd = payload["command"]
+            if hasattr(unreal, "PythonScriptLibrary"):
+                if hasattr(unreal.PythonScriptLibrary, "execute_python_command"):
+                    unreal.PythonScriptLibrary.execute_python_command(cmd)
+                    return
+                if hasattr(unreal.PythonScriptLibrary, "execute_python_command_ex"):
+                    unreal.PythonScriptLibrary.execute_python_command_ex(cmd)
+                    return
+            exec(cmd, {"unreal": unreal})
             return
 
         unreal.log_warning("[UAT] JSON payload missing 'script' or 'command'")
