@@ -455,8 +455,20 @@ def build_scifi_landscape_level():
     base = ensure_material("M_UAT_Scifi_Base", unreal.LinearColor(0.05, 0.08, 0.12, 1.0))
     cyan = ensure_emissive_material("M_UAT_Scifi_Cyan", unreal.LinearColor(0.0, 0.75, 1.0, 1.0), emissive_boost=12.0)
     red = ensure_emissive_material("M_UAT_Scifi_Red", unreal.LinearColor(1.0, 0.25, 0.1, 1.0), emissive_boost=10.0)
-    add_common_lighting(unreal.LinearColor(0.35, 0.6, 1.0, 1.0), 3.5, sky_intensity=0.9)
-    make_ground(base, scale=26.0)
+    add_common_lighting(unreal.LinearColor(0.3, 0.55, 1.0, 1.0), 4.0, sky_intensity=1.2)
+    make_ground(base, scale=50.0)
+
+    # thicken existing fog if present
+    for a in unreal.EditorLevelLibrary.get_all_level_actors():
+        if a.is_a(unreal.ExponentialHeightFog):
+            fc = a.get_component_by_class(unreal.ExponentialHeightFogComponent)
+            if fc:
+                try:
+                    fc.set_editor_property("fog_density", 0.07)
+                    fc.set_editor_property("fog_height_falloff", 0.015)
+                except Exception:
+                    pass
+            break
 
     cube = unreal.EditorAssetLibrary.load_asset(CUBE_MESH_PATH)
     plane = unreal.EditorAssetLibrary.load_asset(PLANE_MESH_PATH)
@@ -492,14 +504,35 @@ def build_scifi_landscape_level():
         tower.set_actor_label(f"ScifiTower_{pos.x}_{pos.y}")
 
     towers = [
-        (unreal.Vector(0.0, 0.0, 0.0), unreal.Vector(1.8, 1.2, 16.0)),
-        (unreal.Vector(900.0, 200.0, 0.0), unreal.Vector(1.4, 1.0, 12.0)),
-        (unreal.Vector(-800.0, -300.0, 0.0), unreal.Vector(1.2, 1.2, 10.0)),
-        (unreal.Vector(200.0, -900.0, 0.0), unreal.Vector(1.0, 1.0, 8.0)),
-        (unreal.Vector(-300.0, 700.0, 0.0), unreal.Vector(1.3, 1.1, 11.0)),
+        (unreal.Vector(0.0, 0.0, 0.0), unreal.Vector(2.3, 1.5, 26.0)),
+        (unreal.Vector(1200.0, 300.0, 0.0), unreal.Vector(1.7, 1.2, 20.0)),
+        (unreal.Vector(-1200.0, -400.0, 0.0), unreal.Vector(1.4, 1.3, 18.0)),
+        (unreal.Vector(400.0, -1200.0, 0.0), unreal.Vector(1.3, 1.1, 15.0)),
+        (unreal.Vector(-600.0, 900.0, 0.0), unreal.Vector(1.5, 1.2, 16.0)),
+        (unreal.Vector(1000.0, -900.0, 0.0), unreal.Vector(1.2, 1.0, 14.0)),
+        (unreal.Vector(-1400.0, 700.0, 0.0), unreal.Vector(1.2, 1.1, 15.0)),
     ]
     for pos, scale in towers:
         spawn_tower(pos, unreal.Vector(scale.x, scale.y, 1.0), scale.z, strips=3)
+
+    # dense mid/foreground grid
+    for gx in range(-3, 4):
+        for gy in range(-3, 4):
+            if abs(gx) <= 1 and abs(gy) <= 1:
+                continue
+            loc = unreal.Vector(gx * 600.0, gy * 600.0, 0.0)
+            height = random.uniform(6.0, 12.0)
+            footprint = unreal.Vector(random.uniform(0.8, 1.4), random.uniform(0.8, 1.4), 1.0)
+            spawn_tower(loc, footprint, height, strips=2)
+
+    # distant horizon glow lights
+    for i in range(10):
+        loc = unreal.Vector(random.uniform(-2600.0, 2600.0), random.uniform(-2600.0, 2600.0), random.uniform(400.0, 900.0))
+        glow = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.PointLight, loc)
+        lcomp = glow.get_component_by_class(unreal.PointLightComponent)
+        if lcomp:
+            lcomp.set_editor_property("intensity", 18000.0)
+            lcomp.set_editor_property("light_color", unreal.LinearColor(0.05, 0.8, 1.0, 1.0))
 
     # elevated sky bridges
     bridges = [
@@ -554,29 +587,34 @@ def build_scifi_landscape_level():
         fog_comp.set_editor_property("fog_height_falloff", 0.02)
 
     # floating neon signs
-    for i in range(5):
-        loc = unreal.Vector(random.uniform(-1000.0, 1000.0), random.uniform(-1000.0, 1000.0), random.uniform(200.0, 700.0))
+    for i in range(10):
+        loc = unreal.Vector(random.uniform(-1400.0, 1400.0), random.uniform(-1400.0, 1400.0), random.uniform(200.0, 900.0))
         sign = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.StaticMeshActor, loc)
         comp = sign.get_component_by_class(unreal.StaticMeshComponent)
         comp.set_static_mesh(plane)
         comp.set_material(0, red if i % 2 == 0 else cyan)
-        comp.set_world_scale3d(unreal.Vector(1.8, 0.2, 1.0))
+        comp.set_world_scale3d(unreal.Vector(random.uniform(1.5, 2.5), 0.25, 1.0))
         sign.set_actor_rotation(unreal.Rotator(0.0, random.uniform(0.0, 360.0), 0.0), teleport_physics=True)
         sign.set_actor_label(f"NeonSign_{i}")
+        light = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.PointLight, loc + unreal.Vector(0.0, 0.0, 120.0))
+        lcomp = light.get_component_by_class(unreal.PointLightComponent)
+        if lcomp:
+            lcomp.set_editor_property("intensity", 11000.0)
+            lcomp.set_editor_property("light_color", unreal.LinearColor(1.0, 0.25, 0.15, 1.0))
 
     # flying cars
     car_mat = ensure_emissive_material("M_UAT_Scifi_Car", unreal.LinearColor(0.1, 0.8, 1.0, 1.0), emissive_boost=14.0)
-    for i in range(12):
-        start = unreal.Vector(-1500.0, random.uniform(-800.0, 800.0), random.uniform(300.0, 800.0))
-        vel = unreal.Vector(random.uniform(400.0, 700.0), 0.0, random.uniform(-30.0, 30.0))
-        spawn_moving_actor(plane, car_mat, start, vel, unreal.Vector(0.6, 1.8, 0.2), f"Car_{i}")
+    for i in range(20):
+        start = unreal.Vector(-2200.0, random.uniform(-1200.0, 1200.0), random.uniform(320.0, 950.0))
+        vel = unreal.Vector(random.uniform(500.0, 900.0), random.uniform(-80.0, 80.0), random.uniform(-40.0, 40.0))
+        spawn_moving_actor(plane, car_mat, start, vel, unreal.Vector(0.7, 2.0, 0.25), f"Car_{i}")
 
     # drones
     drone_mat = ensure_emissive_material("M_UAT_Scifi_Drone", unreal.LinearColor(0.0, 0.9, 0.8, 1.0), emissive_boost=10.0)
     sphere = unreal.EditorAssetLibrary.load_asset(SPHERE_MESH_PATH)
-    for i in range(10):
-        start = unreal.Vector(random.uniform(-900.0, 900.0), random.uniform(-900.0, 900.0), random.uniform(400.0, 900.0))
-        vel = unreal.Vector(random.uniform(-120.0, 120.0), random.uniform(-120.0, 120.0), random.uniform(-40.0, 40.0))
+    for i in range(16):
+        start = unreal.Vector(random.uniform(-1400.0, 1400.0), random.uniform(-1400.0, 1400.0), random.uniform(450.0, 1100.0))
+        vel = unreal.Vector(random.uniform(-180.0, 180.0), random.uniform(-180.0, 180.0), random.uniform(-60.0, 60.0))
         drone = spawn_moving_actor(sphere, drone_mat, start, vel, unreal.Vector(0.35, 0.35, 0.35), f"Drone_{i}")
         light = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.PointLight, start)
         lcomp = light.get_component_by_class(unreal.PointLightComponent)

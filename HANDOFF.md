@@ -41,9 +41,9 @@ Files and what they do:
       - "build_codex_scifi_landscape" (clears /Game/Codex_levels and builds Codex_Scifi_Landscape)
     - If COMMAND is set, main() executes it and returns early.
     - New helper: run_command_once(command_name) to invoke a COMMAND without changing the default.
-    - New helpers for levels: ensure_emissive_material, create_level_with_builder, add_common_lighting, delete_codex_levels, etc.
+    - New helpers for levels: ensure_emissive_material, create_level_with_builder, add_common_lighting, delete_codex_levels, moving actor tick (flying cars/drones), etc.
     - Current level output:
-      - Content/Codex_levels/Codex_Scifi_Landscape.umap (cool neon city inspired by provided reference; cyan emissive strips, red signage, bridges, foggy blue lighting)
+      - Content/Codex_levels/Codex_Scifi_Landscape.umap (neon skyline per ref; layered towers, grid blocks, sky bridges, dense fog, horizon glow, floating neon signs, moving flying cars and drones with lights)
 
   - Content/Python/uat_listener.py
     - Executes remote JSON payloads.
