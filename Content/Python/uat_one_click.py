@@ -61,6 +61,8 @@ CUBE_ROTATE_DEG_PER_SEC = 45.0
 # ============================================================
 _rotating_cubes = []
 _rotate_tick_handle = None
+_moving_actors = []
+_move_tick_handle = None
 
 def ts():
     return time.strftime("%Y%m%d_%H%M%S")
@@ -459,6 +461,20 @@ def build_scifi_landscape_level():
     cube = unreal.EditorAssetLibrary.load_asset(CUBE_MESH_PATH)
     plane = unreal.EditorAssetLibrary.load_asset(PLANE_MESH_PATH)
 
+    def spawn_moving_actor(mesh, material, start, velocity, scale, label):
+        global _moving_actors, _move_tick_handle
+        actor = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.StaticMeshActor, start)
+        comp = actor.get_component_by_class(unreal.StaticMeshComponent)
+        comp.set_static_mesh(mesh)
+        comp.set_world_scale3d(scale)
+        if material:
+            comp.set_material(0, material)
+        actor.set_actor_label(label)
+        _moving_actors.append((actor, velocity))
+        if _move_tick_handle is None:
+            _move_tick_handle = unreal.register_slate_post_tick_callback(_move_tick)
+        return actor
+
     def spawn_tower(pos, footprint, height, strips=3):
         tower = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.StaticMeshActor, pos)
         comp = tower.get_component_by_class(unreal.StaticMeshComponent)
@@ -530,6 +546,47 @@ def build_scifi_landscape_level():
             lcomp.set_editor_property("intensity", 9000.0)
             lcomp.set_editor_property("light_color", unreal.LinearColor(1.0, 0.25, 0.1, 1.0))
 
+    # denser fog
+    fog = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.ExponentialHeightFog, unreal.Vector(0.0, 0.0, 0.0))
+    fog_comp = fog.get_component_by_class(unreal.ExponentialHeightFogComponent)
+    if fog_comp:
+        fog_comp.set_editor_property("fog_density", 0.05)
+        fog_comp.set_editor_property("fog_height_falloff", 0.02)
+
+    # floating neon signs
+    for i in range(5):
+        loc = unreal.Vector(random.uniform(-1000.0, 1000.0), random.uniform(-1000.0, 1000.0), random.uniform(200.0, 700.0))
+        sign = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.StaticMeshActor, loc)
+        comp = sign.get_component_by_class(unreal.StaticMeshComponent)
+        comp.set_static_mesh(plane)
+        comp.set_material(0, red if i % 2 == 0 else cyan)
+        comp.set_world_scale3d(unreal.Vector(1.8, 0.2, 1.0))
+        sign.set_actor_rotation(unreal.Rotator(0.0, random.uniform(0.0, 360.0), 0.0), teleport_physics=True)
+        sign.set_actor_label(f"NeonSign_{i}")
+
+    # flying cars
+    car_mat = ensure_emissive_material("M_UAT_Scifi_Car", unreal.LinearColor(0.1, 0.8, 1.0, 1.0), emissive_boost=14.0)
+    for i in range(12):
+        start = unreal.Vector(-1500.0, random.uniform(-800.0, 800.0), random.uniform(300.0, 800.0))
+        vel = unreal.Vector(random.uniform(400.0, 700.0), 0.0, random.uniform(-30.0, 30.0))
+        spawn_moving_actor(plane, car_mat, start, vel, unreal.Vector(0.6, 1.8, 0.2), f"Car_{i}")
+
+    # drones
+    drone_mat = ensure_emissive_material("M_UAT_Scifi_Drone", unreal.LinearColor(0.0, 0.9, 0.8, 1.0), emissive_boost=10.0)
+    sphere = unreal.EditorAssetLibrary.load_asset(SPHERE_MESH_PATH)
+    for i in range(10):
+        start = unreal.Vector(random.uniform(-900.0, 900.0), random.uniform(-900.0, 900.0), random.uniform(400.0, 900.0))
+        vel = unreal.Vector(random.uniform(-120.0, 120.0), random.uniform(-120.0, 120.0), random.uniform(-40.0, 40.0))
+        drone = spawn_moving_actor(sphere, drone_mat, start, vel, unreal.Vector(0.35, 0.35, 0.35), f"Drone_{i}")
+        light = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.PointLight, start)
+        lcomp = light.get_component_by_class(unreal.PointLightComponent)
+        if lcomp:
+            lcomp.set_editor_property("intensity", 6000.0)
+            lcomp.set_editor_property("light_color", unreal.LinearColor(0.0, 0.9, 0.8, 1.0))
+        _moving_actors.append((light, vel))
+        if _move_tick_handle is None:
+            _move_tick_handle = unreal.register_slate_post_tick_callback(_move_tick)
+
 def _stop_rotate_tick():
     global _rotate_tick_handle
     if _rotate_tick_handle is not None:
@@ -554,6 +611,30 @@ def _rotate_tick(delta_seconds):
     _rotating_cubes = alive
     if not _rotating_cubes:
         _stop_rotate_tick()
+
+def _stop_move_tick():
+    global _move_tick_handle
+    if _move_tick_handle is not None:
+        unreal.unregister_slate_post_tick_callback(_move_tick_handle)
+        _move_tick_handle = None
+
+def _move_tick(delta_seconds):
+    global _moving_actors
+    if not _moving_actors:
+        _stop_move_tick()
+        return
+
+    alive = []
+    for actor, vel in _moving_actors:
+        if not unreal.SystemLibrary.is_valid(actor):
+            continue
+        loc = actor.get_actor_location()
+        loc += vel * delta_seconds
+        actor.set_actor_location(loc, sweep=False, teleport=True)
+        alive.append((actor, vel))
+    _moving_actors = alive
+    if not _moving_actors:
+        _stop_move_tick()
 
 # ============================================================
 # MATERIALS (STABLE UE5 IMPLEMENTATION)
