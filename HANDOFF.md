@@ -21,7 +21,7 @@ Current flow:
 Files and what they do:
   - Content/Python/uat_one_click.py
     - Primary command runner.
-    - COMMAND currently set to "diagnostic_solar_system".
+    - COMMAND currently set to None (set to a command to force quick actions).
     - Added solar system builder:
       - clear_shape_actors() removes StaticMeshActor / InstancedStaticMeshActor / ProceduralMeshActor.
       - spawn_colored_sphere() helper creates colored sphere with label.
@@ -37,8 +37,13 @@ Files and what they do:
       - "log_marker_and_snapshot"
       - "add_blue_sphere" (still available)
       - "write_log_paths" (writes Saved/Automation/uat_log_paths.txt)
+      - "build_codex_levels" (legacy multi-level builder)
+      - "build_codex_scifi_landscape" (clears /Game/Codex_levels and builds Codex_Scifi_Landscape)
     - If COMMAND is set, main() executes it and returns early.
     - New helper: run_command_once(command_name) to invoke a COMMAND without changing the default.
+    - New helpers for levels: ensure_emissive_material, create_level_with_builder, add_common_lighting, delete_codex_levels, etc.
+    - Current level output:
+      - Content/Codex_levels/Codex_Scifi_Landscape.umap (cool neon city inspired by provided reference; cyan emissive strips, red signage, bridges, foggy blue lighting)
 
   - Content/Python/uat_listener.py
     - Executes remote JSON payloads.
