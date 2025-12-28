@@ -547,7 +547,7 @@ def _build_scifi_landscape_level_impl():
         unreal.log_error("[UAT] Missing cube/plane/sphere mesh; aborting build_scifi_landscape_level")
         return
 
-    add_common_lighting(unreal.LinearColor(0.28, 0.55, 1.0, 1.0), 5.5, sky_intensity=1.3)
+    add_common_lighting(unreal.LinearColor(0.28, 0.55, 1.0, 1.0), 4.0, sky_intensity=1.0)
     make_ground(base, scale=95.0)
 
     # water plane under base for subtle reflections
@@ -629,7 +629,7 @@ def _build_scifi_landscape_level_impl():
         glow = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.PointLight, loc)
         lcomp = glow.get_component_by_class(unreal.PointLightComponent)
         if lcomp:
-            lcomp.set_editor_property("intensity", random.uniform(16000.0, 26000.0))
+            lcomp.set_editor_property("intensity", random.uniform(9000.0, 16000.0))
             set_light_color_safe(lcomp, unreal.LinearColor(0.05, 0.82, 1.0, 1.0))
 
     # elevated sky bridges
@@ -684,7 +684,7 @@ def _build_scifi_landscape_level_impl():
         light = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.PointLight, loc)
         lcomp = light.get_component_by_class(unreal.PointLightComponent)
         if lcomp:
-            lcomp.set_editor_property("intensity", random.uniform(7000.0, 12000.0))
+            lcomp.set_editor_property("intensity", random.uniform(4000.0, 8000.0))
             set_light_color_safe(lcomp, unreal.LinearColor(0.0, 0.75, 1.0, 1.0))
 
     # red accent lights near foreground
@@ -693,7 +693,7 @@ def _build_scifi_landscape_level_impl():
         light = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.PointLight, loc)
         lcomp = light.get_component_by_class(unreal.PointLightComponent)
         if lcomp:
-            lcomp.set_editor_property("intensity", 9000.0)
+            lcomp.set_editor_property("intensity", 6000.0)
             lcomp.set_editor_property("light_color", unreal.LinearColor(1.0, 0.25, 0.1, 1.0))
 
     # denser fog
@@ -716,7 +716,7 @@ def _build_scifi_landscape_level_impl():
         sign_light = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.PointLight, loc + unreal.Vector(0.0, 0.0, 160.0))
         lcomp = sign_light.get_component_by_class(unreal.PointLightComponent)
         if lcomp:
-            lcomp.set_editor_property("intensity", 16000.0)
+            lcomp.set_editor_property("intensity", 9000.0)
             set_light_color_safe(lcomp, unreal.LinearColor(1.0, 0.15, 0.6, 1.0) if i % 2 == 0 else unreal.LinearColor(0.0, 0.85, 1.0, 1.0))
         signs_spawned += 1
 
@@ -726,7 +726,7 @@ def _build_scifi_landscape_level_impl():
         vel = unreal.Vector(random.uniform(-260.0, 260.0), random.uniform(-260.0, 260.0), random.uniform(-120.0, 120.0))
         color_a = unreal.LinearColor(0.0, 0.8, 1.0, 1.0)
         color_b = unreal.LinearColor(1.0, 0.15, 0.65, 1.0)
-        _spawn_moving_light(start, vel, random.uniform(9000.0, 14000.0), color_a, color_b, hue_speed=0.7, attenuation=1600.0, label=f"MovingLight_{i}")
+        _spawn_moving_light(start, vel, random.uniform(6000.0, 10000.0), color_a, color_b, hue_speed=0.7, attenuation=1600.0, label=f"MovingLight_{i}")
         moving_lights_spawned += 1
 
     # flying cars with headlights
@@ -736,7 +736,7 @@ def _build_scifi_landscape_level_impl():
         vel = unreal.Vector(random.uniform(700.0, 1150.0), random.uniform(-160.0, 160.0), random.uniform(-70.0, 70.0))
         actor = _spawn_moving_actor(plane, car_mat, start, vel, unreal.Vector(0.9, 2.8, 0.35), f"Car_{i}")
         head_offset = unreal.Vector(0.0, 0.0, 40.0)
-        _spawn_moving_light(start + head_offset, vel, random.uniform(9000.0, 15000.0), unreal.LinearColor(0.1, 0.9, 1.0, 1.0), unreal.LinearColor(1.0, 0.25, 0.1, 1.0), hue_speed=0.9, attenuation=1200.0, label=f"CarLight_{i}")
+        _spawn_moving_light(start + head_offset, vel, random.uniform(5000.0, 9000.0), unreal.LinearColor(0.1, 0.9, 1.0, 1.0), unreal.LinearColor(1.0, 0.25, 0.1, 1.0), hue_speed=0.9, attenuation=1200.0, label=f"CarLight_{i}")
         if actor:
             cars_spawned += 1
 
@@ -746,7 +746,7 @@ def _build_scifi_landscape_level_impl():
         start = unreal.Vector(random.uniform(-2200.0, 2200.0), random.uniform(-2200.0, 2200.0), random.uniform(520.0, 1400.0))
         vel = unreal.Vector(random.uniform(-260.0, 260.0), random.uniform(-260.0, 260.0), random.uniform(-90.0, 90.0))
         drone = _spawn_moving_actor(sphere, drone_mat, start, vel, unreal.Vector(0.5, 0.5, 0.5), f"Drone_{i}")
-        _spawn_moving_light(start + unreal.Vector(0.0, 0.0, 70.0), vel, random.uniform(8000.0, 14000.0), unreal.LinearColor(0.0, 0.9, 0.8, 1.0), unreal.LinearColor(1.0, 0.2, 0.7, 1.0), hue_speed=1.1, attenuation=900.0, label=f"DroneLight_{i}")
+        _spawn_moving_light(start + unreal.Vector(0.0, 0.0, 70.0), vel, random.uniform(5000.0, 9000.0), unreal.LinearColor(0.0, 0.9, 0.8, 1.0), unreal.LinearColor(1.0, 0.2, 0.7, 1.0), hue_speed=1.1, attenuation=900.0, label=f"DroneLight_{i}")
         if drone:
             drones_spawned += 1
 
