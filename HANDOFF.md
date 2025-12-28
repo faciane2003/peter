@@ -43,7 +43,7 @@ Files and what they do:
     - New helper: run_command_once(command_name) to invoke a COMMAND without changing the default.
     - New helpers for levels: ensure_emissive_material, create_level_with_builder, add_common_lighting, delete_codex_levels, moving actor tick (flying cars/drones), etc.
     - Current level output:
-      - Content/Codex_levels/Codex_Scifi_Landscape.umap (neon skyline per ref; larger footprint, water underlay, thicker fog, layered towers + dense grid, expanded sky bridges, more neon signs with lights, more flying cars and drones with lights)
+      - Content/Codex_levels/Codex_Scifi_Landscape.umap (neon skyline per refs; larger footprint, water underlay, thicker fog, layered towers + dense grid, expanded sky bridges/highways, magenta/cyan signage, more flying cars and drones with lights)
     - Default auto-spawns (triangles/sphere circle/grass) now disabled to keep scenes clean.
 
   - Content/Python/uat_listener.py
@@ -80,6 +80,15 @@ Known gotchas:
 Log files:
   - Saved/Automation/uat_script.log (append-only)
   - Saved/Automation/uat_log_snapshot.txt (full snapshot)
+
+Changelog (recent):
+  - 2025-12-28: Fixed scifi build errors (light colors, missing meshes) and verified build (actors ~253) for Codex_Scifi_Landscape.
+  - 2025-12-28: Further densified Codex_Scifi_Landscape (water plane, thicker fog, more towers/grid, highways, magenta/cyan signage, more cars/drones).
+  - 2025-12-28: Expanded Codex_Scifi_Landscape (bigger footprint, water underlay, denser grid, thicker fog, more bridges/signs, more flying cars/drones); disabled default triangles/sphere/grass auto-spawns.
+  - 2025-12-28: Added build_codex_scifi_landscape command; cleared old Codex levels; initial neon skyline with moving traffic/signs.
+  - 2025-12-28: Built multiple themed Codex levels (desert, forest, neon, snow, volcano, city grid, canyon, sky islands, checker, ruins, chromatic, crystal, industrial).
+  - 2025-12-28: Added UAT menu in Tools; logging to file + snapshot helpers.
+  - 2025-12-27: Set up solar system builder, rotating cubes, triangles, grass, etc.
 
 Git status:
   - Latest commit: 6d49809

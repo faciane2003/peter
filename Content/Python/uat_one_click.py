@@ -147,6 +147,15 @@ def set_directional_light(actor, intensity, color):
         except Exception:
             comp.set_editor_property("light_color", color.to_fcolor(True))
 
+def set_light_color_safe(light_comp, color, use_srgb=True):
+    try:
+        if hasattr(light_comp, "set_light_color"):
+            light_comp.set_light_color(color, use_srgb)
+            return
+        light_comp.set_editor_property("light_color", color.to_fcolor(use_srgb))
+    except Exception:
+        pass
+
 def add_common_lighting(sun_color, sun_intensity, sky_intensity=1.0):
     sun = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.DirectionalLight, unreal.Vector(0.0, 0.0, 400.0))
     sun.set_actor_rotation(unreal.Rotator(-45.0, 35.0, 0.0), teleport_physics=True)
@@ -189,8 +198,11 @@ def create_level_with_builder(name, builder_fn):
         builder_fn()
     except Exception as exc:
         unreal.log_error(f"[UAT] Builder failed for {level_path}: {exc}")
+        unreal.EditorLevelLibrary.save_current_level()
+        return
     unreal.EditorLevelLibrary.save_current_level()
-    log(f"Built level {level_path}")
+    actor_count = len(unreal.EditorLevelLibrary.get_all_level_actors() or [])
+    log(f"Built level {level_path} (actors: {actor_count})")
 
 def build_desert_level():
     sand = ensure_material("M_UAT_Sand", unreal.LinearColor(0.9, 0.7, 0.45, 1.0))
@@ -452,9 +464,31 @@ def build_industrial_level():
         comp.set_world_scale3d(unreal.Vector(2.0, 2.0, random.uniform(2.0, 5.0)))
 
 def build_scifi_landscape_level():
+    log("Scifi build: start")
+    try:
+        _build_scifi_landscape_level_impl()
+    except Exception as exc:
+        unreal.log_error(f"[UAT] Scifi build failed: {exc}")
+        return
+
+def _build_scifi_landscape_level_impl():
+    towers_spawned = 0
+    bridges_spawned = 0
+    highways_spawned = 0
+    signs_spawned = 0
+    cars_spawned = 0
+    drones_spawned = 0
+
     base = ensure_material("M_UAT_Scifi_Base", unreal.LinearColor(0.05, 0.08, 0.12, 1.0))
     cyan = ensure_emissive_material("M_UAT_Scifi_Cyan", unreal.LinearColor(0.0, 0.75, 1.0, 1.0), emissive_boost=12.0)
     red = ensure_emissive_material("M_UAT_Scifi_Red", unreal.LinearColor(1.0, 0.25, 0.1, 1.0), emissive_boost=10.0)
+    magenta = ensure_emissive_material("M_UAT_Scifi_Magenta", unreal.LinearColor(1.0, 0.1, 0.65, 1.0), emissive_boost=12.0)
+    cube = unreal.EditorAssetLibrary.load_asset(CUBE_MESH_PATH)
+    plane = unreal.EditorAssetLibrary.load_asset(PLANE_MESH_PATH)
+    if not cube or not plane:
+        unreal.log_error("[UAT] Missing cube or plane mesh; aborting build_scifi_landscape_level")
+        return
+
     add_common_lighting(unreal.LinearColor(0.28, 0.55, 1.0, 1.0), 5.5, sky_intensity=1.3)
     make_ground(base, scale=90.0)
 
@@ -467,6 +501,22 @@ def build_scifi_landscape_level():
     wcomp.set_material(0, water)
     water_actor.set_actor_label("WaterPlane")
 
+    # periphery billboards
+    billboard_positions = [
+        unreal.Vector(0.0, -2400.0, 400.0),
+        unreal.Vector(-2400.0, 0.0, 420.0),
+        unreal.Vector(2400.0, 0.0, 420.0),
+        unreal.Vector(0.0, 2400.0, 440.0),
+    ]
+    for i, pos in enumerate(billboard_positions):
+        bb = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.StaticMeshActor, pos)
+        comp = bb.get_component_by_class(unreal.StaticMeshComponent)
+        comp.set_static_mesh(plane)
+        comp.set_world_scale3d(unreal.Vector(12.0, 0.5, 8.0))
+        comp.set_material(0, magenta if i % 2 == 0 else cyan)
+        bb.set_actor_rotation(unreal.Rotator(0.0, 0.0 if i % 2 == 0 else 90.0, 0.0), teleport_physics=True)
+        bb.set_actor_label(f"Billboard_{i}")
+
     # thicken fog (add new fog actor)
     fog = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.ExponentialHeightFog, unreal.Vector(0.0, 0.0, 0.0))
     fcomp = fog.get_component_by_class(unreal.ExponentialHeightFogComponent)
@@ -474,11 +524,11 @@ def build_scifi_landscape_level():
         fcomp.set_editor_property("fog_density", 0.08)
         fcomp.set_editor_property("fog_height_falloff", 0.012)
 
-    cube = unreal.EditorAssetLibrary.load_asset(CUBE_MESH_PATH)
-    plane = unreal.EditorAssetLibrary.load_asset(PLANE_MESH_PATH)
-
     def spawn_moving_actor(mesh, material, start, velocity, scale, label):
         global _moving_actors, _move_tick_handle
+        if not mesh:
+            unreal.log_error(f"[UAT] Missing mesh for {label}")
+            return None
         actor = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.StaticMeshActor, start)
         comp = actor.get_component_by_class(unreal.StaticMeshComponent)
         comp.set_static_mesh(mesh)
@@ -518,6 +568,7 @@ def build_scifi_landscape_level():
     ]
     for pos, scale in towers:
         spawn_tower(pos, unreal.Vector(scale.x, scale.y, 1.0), scale.z, strips=3)
+        towers_spawned += 1
 
     # dense mid/foreground grid
     for gx in range(-4, 5):
@@ -537,7 +588,7 @@ def build_scifi_landscape_level():
         lcomp = glow.get_component_by_class(unreal.PointLightComponent)
         if lcomp:
             lcomp.set_editor_property("intensity", 20000.0)
-            lcomp.set_editor_property("light_color", unreal.LinearColor(0.05, 0.8, 1.0, 1.0))
+            set_light_color_safe(lcomp, unreal.LinearColor(0.05, 0.8, 1.0, 1.0))
 
     # elevated sky bridges
     bridges = [
@@ -558,6 +609,24 @@ def build_scifi_landscape_level():
         scomp.set_material(0, cyan)
         scomp.set_world_scale3d(unreal.Vector(scale.x, 0.08, 0.1))
         bridge.set_actor_label(f"Bridge_{i}")
+        bridges_spawned += 1
+
+    # mid/highways with magenta/cyan rails
+    highways = [
+        (unreal.Vector(0.0, -900.0, 450.0), unreal.Vector(30.0, 0.9, 0.25), 0.0, cyan),
+        (unreal.Vector(-1200.0, 200.0, 520.0), unreal.Vector(26.0, 0.9, 0.25), 15.0, magenta),
+        (unreal.Vector(300.0, 1200.0, 480.0), unreal.Vector(22.0, 0.9, 0.25), -20.0, cyan),
+        (unreal.Vector(1100.0, -400.0, 550.0), unreal.Vector(24.0, 0.9, 0.25), 10.0, magenta),
+    ]
+    for idx, (pos, scl, yaw, mat) in enumerate(highways):
+        road = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.StaticMeshActor, pos)
+        comp = road.get_component_by_class(unreal.StaticMeshComponent)
+        comp.set_static_mesh(plane)
+        comp.set_material(0, mat)
+        comp.set_world_scale3d(scl)
+        road.set_actor_rotation(unreal.Rotator(0.0, yaw, 0.0), teleport_physics=True)
+        road.set_actor_label(f"Highway_{idx}")
+        highways_spawned += 1
 
     # neon signage at foreground
     sign = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.StaticMeshActor, unreal.Vector(-1200.0, -200.0, 150.0))
@@ -592,44 +661,52 @@ def build_scifi_landscape_level():
         fog_comp.set_editor_property("fog_density", 0.05)
         fog_comp.set_editor_property("fog_height_falloff", 0.02)
 
-    # floating neon signs
-    for i in range(14):
-        loc = unreal.Vector(random.uniform(-1800.0, 1800.0), random.uniform(-1800.0, 1800.0), random.uniform(200.0, 950.0))
+    # floating neon signs (cyan/magenta)
+    for i in range(18):
+        loc = unreal.Vector(random.uniform(-2200.0, 2200.0), random.uniform(-2200.0, 2200.0), random.uniform(220.0, 1100.0))
         sign = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.StaticMeshActor, loc)
         comp = sign.get_component_by_class(unreal.StaticMeshComponent)
         comp.set_static_mesh(plane)
-        comp.set_material(0, red if i % 2 == 0 else cyan)
-        comp.set_world_scale3d(unreal.Vector(random.uniform(1.5, 3.0), 0.3, 1.0))
+        comp.set_material(0, magenta if i % 2 == 0 else cyan)
+        comp.set_world_scale3d(unreal.Vector(random.uniform(1.5, 3.2), 0.35, 1.0))
         sign.set_actor_rotation(unreal.Rotator(0.0, random.uniform(0.0, 360.0), random.uniform(-5.0, 5.0)), teleport_physics=True)
         sign.set_actor_label(f"NeonSign_{i}")
-        light = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.PointLight, loc + unreal.Vector(0.0, 0.0, 140.0))
+        light = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.PointLight, loc + unreal.Vector(0.0, 0.0, 160.0))
         lcomp = light.get_component_by_class(unreal.PointLightComponent)
         if lcomp:
-            lcomp.set_editor_property("intensity", 14000.0)
-            lcomp.set_editor_property("light_color", unreal.LinearColor(1.0, 0.25, 0.15, 1.0))
+            lcomp.set_editor_property("intensity", 16000.0)
+            set_light_color_safe(lcomp, unreal.LinearColor(1.0, 0.15, 0.6, 1.0))
+        signs_spawned += 1
 
     # flying cars
     car_mat = ensure_emissive_material("M_UAT_Scifi_Car", unreal.LinearColor(0.1, 0.8, 1.0, 1.0), emissive_boost=14.0)
-    for i in range(28):
-        start = unreal.Vector(-2600.0, random.uniform(-1400.0, 1400.0), random.uniform(320.0, 1100.0))
-        vel = unreal.Vector(random.uniform(520.0, 980.0), random.uniform(-120.0, 120.0), random.uniform(-50.0, 50.0))
-        spawn_moving_actor(plane, car_mat, start, vel, unreal.Vector(0.8, 2.4, 0.3), f"Car_{i}")
+    for i in range(36):
+        start = unreal.Vector(-3200.0, random.uniform(-1600.0, 1600.0), random.uniform(320.0, 1200.0))
+        vel = unreal.Vector(random.uniform(600.0, 1050.0), random.uniform(-140.0, 140.0), random.uniform(-60.0, 60.0))
+        actor = spawn_moving_actor(plane, car_mat, start, vel, unreal.Vector(0.85, 2.6, 0.32), f"Car_{i}")
+        if actor:
+            cars_spawned += 1
 
     # drones
     drone_mat = ensure_emissive_material("M_UAT_Scifi_Drone", unreal.LinearColor(0.0, 0.9, 0.8, 1.0), emissive_boost=10.0)
     sphere = unreal.EditorAssetLibrary.load_asset(SPHERE_MESH_PATH)
-    for i in range(22):
-        start = unreal.Vector(random.uniform(-1800.0, 1800.0), random.uniform(-1800.0, 1800.0), random.uniform(480.0, 1300.0))
-        vel = unreal.Vector(random.uniform(-200.0, 200.0), random.uniform(-200.0, 200.0), random.uniform(-70.0, 70.0))
-        drone = spawn_moving_actor(sphere, drone_mat, start, vel, unreal.Vector(0.4, 0.4, 0.4), f"Drone_{i}")
+    for i in range(26):
+        start = unreal.Vector(random.uniform(-2000.0, 2000.0), random.uniform(-2000.0, 2000.0), random.uniform(520.0, 1400.0))
+        vel = unreal.Vector(random.uniform(-240.0, 240.0), random.uniform(-240.0, 240.0), random.uniform(-80.0, 80.0))
+        drone = spawn_moving_actor(sphere, drone_mat, start, vel, unreal.Vector(0.45, 0.45, 0.45), f"Drone_{i}")
         light = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.PointLight, start)
         lcomp = light.get_component_by_class(unreal.PointLightComponent)
         if lcomp:
-            lcomp.set_editor_property("intensity", 6000.0)
-            lcomp.set_editor_property("light_color", unreal.LinearColor(0.0, 0.9, 0.8, 1.0))
+            lcomp.set_editor_property("intensity", 7000.0)
+            set_light_color_safe(lcomp, unreal.LinearColor(0.0, 0.9, 0.8, 1.0))
         _moving_actors.append((light, vel))
         if _move_tick_handle is None:
             _move_tick_handle = unreal.register_slate_post_tick_callback(_move_tick)
+        if drone:
+            drones_spawned += 1
+
+    total_actors = len(unreal.EditorLevelLibrary.get_all_level_actors() or [])
+    log(f"Scifi build summary: towers={towers_spawned}, bridges={bridges_spawned}, highways={highways_spawned}, signs={signs_spawned}, cars={cars_spawned}, drones={drones_spawned}, total_actors={total_actors}")
 
 def _stop_rotate_tick():
     global _rotate_tick_handle
