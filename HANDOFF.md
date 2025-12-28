@@ -43,7 +43,8 @@ Files and what they do:
     - New helper: run_command_once(command_name) to invoke a COMMAND without changing the default.
     - New helpers for levels: ensure_emissive_material, create_level_with_builder, add_common_lighting, delete_codex_levels, moving actor tick (flying cars/drones), etc.
     - Current level output:
-      - Content/Codex_levels/Codex_Scifi_Landscape.umap (neon skyline per ref; layered towers, grid blocks, sky bridges, dense fog, horizon glow, floating neon signs, moving flying cars and drones with lights)
+      - Content/Codex_levels/Codex_Scifi_Landscape.umap (neon skyline per ref; larger footprint, water underlay, thicker fog, layered towers + dense grid, expanded sky bridges, more neon signs with lights, more flying cars and drones with lights)
+    - Default auto-spawns (triangles/sphere circle/grass) now disabled to keep scenes clean.
 
   - Content/Python/uat_listener.py
     - Executes remote JSON payloads.
