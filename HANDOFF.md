@@ -82,6 +82,9 @@ Log files:
   - Saved/Automation/uat_log_snapshot.txt (full snapshot)
 
 Changelog (recent):
+  - 2025-12-28: Added rotating red test cube helper/command (spawn_rotating_test_cube) to verify tick; confirmed visible in editor.
+  - 2025-12-28: Rebuilt Codex_Scifi_Landscape and confirmed in-editor playback; COMMAND reset to None after run.
+  - 2025-12-28: Rebuilt Codex_Scifi_Landscape builder with animated cars/drones/roaming lights, color-cycling headlights, thicker fog, billboard frame, and bounded bounce movement tick (logged every ~120 ticks).
   - 2025-12-28: Fixed scifi build errors (light colors, missing meshes) and verified build (actors ~253) for Codex_Scifi_Landscape.
   - 2025-12-28: Further densified Codex_Scifi_Landscape (water plane, thicker fog, more towers/grid, highways, magenta/cyan signage, more cars/drones).
   - 2025-12-28: Expanded Codex_Scifi_Landscape (bigger footprint, water underlay, denser grid, thicker fog, more bridges/signs, more flying cars/drones); disabled default triangles/sphere/grass auto-spawns.
