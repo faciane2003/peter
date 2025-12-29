@@ -764,6 +764,39 @@ def spawn_red_lights_near_camera():
         make_light(base + offset, f"Line_Light_Red_{i+1}", 3200.0, unreal.LinearColor(1.0, 0.15, 0.15, 1.0), attenuation=700.0)
     log(f"Spawned red light cluster near camera at {base}")
 
+def spawn_floating_spheres(count=5):
+    """Spawn glowing spheres that float around the city."""
+    sphere = unreal.EditorAssetLibrary.load_asset(SPHERE_MESH_PATH)
+    if not sphere:
+        unreal.log_error(f"[UAT] Sphere mesh not found: {SPHERE_MESH_PATH}")
+        return
+    glow_mat = ensure_emissive_material("M_UAT_Float_Glow", unreal.LinearColor(0.2, 0.8, 1.0, 1.0), emissive_boost=8.0)
+    base_range = 1600.0
+    min_z = 300.0
+    max_z = 1200.0
+    for i in range(count):
+        start = unreal.Vector(
+            random.uniform(-base_range, base_range),
+            random.uniform(-base_range, base_range),
+            random.uniform(min_z, max_z)
+        )
+        vel = unreal.Vector(
+            random.uniform(-120.0, 120.0),
+            random.uniform(-120.0, 120.0),
+            random.uniform(-60.0, 60.0)
+        )
+        actor = _spawn_moving_actor(
+            sphere,
+            glow_mat,
+            start,
+            vel,
+            unreal.Vector(1.2, 1.2, 1.2),
+            f"FloatSphere_{i+1}"
+        )
+        if actor:
+            _set_folder(actor, "FX_Lights")
+    log(f"Spawned {count} floating spheres")
+
 def setup_overview_plane():
     """Decorate ov_plane and overview_cube*/ov_text* with labels and lights."""
     cyan = ensure_emissive_material("M_UAT_Scifi_Cyan", unreal.LinearColor(0.0, 0.75, 1.0, 1.0), emissive_boost=12.0)
@@ -1066,6 +1099,193 @@ def replace_emissive_with_matte():
         if changed:
             swapped += 1
     log(f"Replaced emissive materials with matte on {swapped} actors")
+
+def replace_emissive_with_grey():
+    """Swap emissive materials to a matte grey on all static mesh actors."""
+    emissive_names = {
+        "M_UAT_Scifi_Cyan",
+        "M_UAT_Scifi_Magenta",
+        "M_UAT_Scifi_Red",
+        "M_UAT_Scifi_Car",
+        "M_UAT_Scifi_Drone",
+        "M_UAT_Scifi_Water",
+        "M_UAT_Test_Red",
+        "M_UAT_Float_Glow",
+        "M_UAT_NeonFloor",
+        "M_UAT_NeonPillar",
+        "M_UAT_GlassGlow",
+        "M_UAT_Lava",
+        "M_UAT_ChromaticA",
+        "M_UAT_ChromaticB",
+        "M_UAT_Accent",
+    }
+    grey_mat = ensure_material("M_UAT_MatteGrey", unreal.LinearColor(0.4, 0.4, 0.4, 1.0))
+    swapped = 0
+    actors = list(unreal.EditorLevelLibrary.get_all_level_actors() or [])
+    for actor in actors:
+        if not isinstance(actor, unreal.StaticMeshActor):
+            continue
+        comp = actor.get_component_by_class(unreal.StaticMeshComponent)
+        if not comp:
+            continue
+        mats = comp.get_materials()
+        changed = False
+        for idx, m in enumerate(mats):
+            if not m:
+                continue
+            name = m.get_name()
+            lname = name.lower()
+            if (
+                name in emissive_names
+                or "emissive" in lname
+                or "glow" in lname
+                or "neon" in lname
+                or "scifi_" in lname
+            ):
+                comp.set_material(idx, grey_mat)
+                changed = True
+        if changed:
+            swapped += 1
+    log(f"Replaced emissive materials with matte grey on {swapped} actors")
+
+def scale_all_lights(intensity_mult=10.0, radius_mult=3.0):
+    """Scale intensity and radius of all light components."""
+    actors = list(unreal.EditorLevelLibrary.get_all_level_actors() or [])
+    updated = 0
+    for actor in actors:
+        if not actor:
+            continue
+        comp = None
+        if isinstance(actor, unreal.PointLight):
+            comp = actor.get_component_by_class(unreal.PointLightComponent)
+        elif isinstance(actor, unreal.SpotLight):
+            comp = actor.get_component_by_class(unreal.SpotLightComponent)
+        elif isinstance(actor, unreal.RectLight):
+            comp = actor.get_component_by_class(unreal.RectLightComponent)
+        elif isinstance(actor, unreal.DirectionalLight):
+            comp = actor.get_component_by_class(unreal.DirectionalLightComponent)
+        if not comp:
+            continue
+        try:
+            intensity = comp.get_editor_property("intensity")
+            comp.set_editor_property("intensity", intensity * intensity_mult)
+        except Exception:
+            pass
+        if hasattr(comp, "get_editor_property"):
+            try:
+                radius = comp.get_editor_property("attenuation_radius")
+                comp.set_editor_property("attenuation_radius", radius * radius_mult)
+            except Exception:
+                pass
+        updated += 1
+    log(f"Scaled lights: updated={updated}, intensity x{intensity_mult}, radius x{radius_mult}")
+
+def add_ground_fog_layer():
+    """Add a low-lying fog layer that fades out around ~30 feet."""
+    fog = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.ExponentialHeightFog, unreal.Vector(0.0, 0.0, 0.0))
+    comp = fog.get_component_by_class(unreal.ExponentialHeightFogComponent)
+    if comp:
+        comp.set_editor_property("fog_density", 0.12)
+        comp.set_editor_property("fog_height_falloff", 0.06)
+        comp.set_editor_property("start_distance", 0.0)
+        try:
+            comp.set_editor_property("fog_max_opacity", 0.6)
+        except Exception:
+            pass
+        try:
+            comp.set_editor_property("fog_height_offset", 0.0)
+        except Exception:
+            pass
+    fog.set_actor_label("GroundFog_Layer")
+    log("Added ground fog layer")
+
+def boost_fog_visibility():
+    """Crank fog settings on all fog actors so it's clearly visible."""
+    actors = list(unreal.EditorLevelLibrary.get_all_level_actors() or [])
+    updated = 0
+    for actor in actors:
+        if not isinstance(actor, unreal.ExponentialHeightFog):
+            continue
+        comp = actor.get_component_by_class(unreal.ExponentialHeightFogComponent)
+        if not comp:
+            continue
+        try:
+            comp.set_editor_property("fog_density", 0.3)
+            comp.set_editor_property("fog_height_falloff", 0.04)
+            comp.set_editor_property("fog_max_opacity", 0.9)
+            comp.set_editor_property("start_distance", 0.0)
+            comp.set_editor_property("fog_in_scattering_color", unreal.LinearColor(0.2, 0.4, 0.6, 1.0))
+            comp.set_editor_property("fog_height_offset", 300.0)
+        except Exception:
+            pass
+        try:
+            comp.set_editor_property("volumetric_fog", True)
+            comp.set_editor_property("volumetric_fog_scattering_distribution", 0.2)
+            comp.set_editor_property("volumetric_fog_albedo", unreal.LinearColor(0.9, 0.9, 0.9, 1.0))
+            comp.set_editor_property("volumetric_fog_extinction_scale", 8.0)
+            comp.set_editor_property("volumetric_fog_distance", 6000.0)
+        except Exception:
+            pass
+        updated += 1
+    log(f"Boosted fog visibility on {updated} fog actors")
+
+def raise_fog_layer(height_offset=300.0):
+    """Raise fog layer height to make it visible above ground clutter."""
+    actors = list(unreal.EditorLevelLibrary.get_all_level_actors() or [])
+    updated = 0
+    for actor in actors:
+        if not isinstance(actor, unreal.ExponentialHeightFog):
+            continue
+        comp = actor.get_component_by_class(unreal.ExponentialHeightFogComponent)
+        if not comp:
+            continue
+        try:
+            comp.set_editor_property("fog_height_offset", height_offset)
+        except Exception:
+            pass
+        updated += 1
+    log(f"Raised fog height on {updated} fog actors to {height_offset}")
+
+def spawn_fog_sheets(count=3):
+    """Spawn translucent fog sheet planes near ground for guaranteed visibility."""
+    plane = unreal.EditorAssetLibrary.load_asset(PLANE_MESH_PATH)
+    if not plane:
+        unreal.log_error(f"[UAT] Plane mesh not found: {PLANE_MESH_PATH}")
+        return
+    fog_mat = ensure_fog_sheet_material(opacity=0.18)
+    base = unreal.Vector(0.0, 0.0, 60.0)
+    for i in range(count):
+        z = base.z + i * 140.0
+        start = unreal.Vector(base.x, base.y, z)
+        vel = unreal.Vector(random.uniform(-25.0, 25.0), random.uniform(-25.0, 25.0), random.uniform(-5.0, 5.0))
+        sheet = _spawn_moving_actor(
+            plane,
+            fog_mat,
+            start,
+            vel,
+            unreal.Vector(90.0, 90.0, 1.0),
+            f"FogSheet_{i+1}"
+        )
+        if sheet:
+            _set_folder(sheet, "FX_Lights")
+    log(f"Spawned {count} fog sheets")
+
+def set_floating_orbs_emissive():
+    """Set floating orbs (FloatSphere_*) to emissive glow material."""
+    glow_mat = ensure_emissive_material("M_UAT_Float_Glow", unreal.LinearColor(0.2, 0.8, 1.0, 1.0), emissive_boost=8.0)
+    actors = list(unreal.EditorLevelLibrary.get_all_level_actors() or [])
+    updated = 0
+    for actor in actors:
+        if not actor:
+            continue
+        if not actor.get_actor_label().startswith("FloatSphere_"):
+            continue
+        comp = actor.get_component_by_class(unreal.StaticMeshComponent)
+        if not comp:
+            continue
+        comp.set_material(0, glow_mat)
+        updated += 1
+    log(f"Set emissive material on {updated} floating orbs")
 
 def _build_scifi_landscape_level_impl():
     towers_spawned = 0
@@ -1514,6 +1734,52 @@ def ensure_emissive_material(name, color, emissive_boost=5.0):
     unreal.MaterialEditingLibrary.recompile_material(material)
     unreal.EditorAssetLibrary.save_asset(mat_path)
     log(f"Created emissive material {mat_path}")
+    return material
+
+def ensure_fog_sheet_material(name="M_UAT_FogSheet", color=None, opacity=0.2):
+    asset_tools = unreal.AssetToolsHelpers.get_asset_tools()
+    mat_path = f"{MATERIAL_PATH}/{name}"
+    if unreal.EditorAssetLibrary.does_asset_exist(mat_path):
+        return unreal.EditorAssetLibrary.load_asset(mat_path)
+
+    unreal.EditorAssetLibrary.make_directory(MATERIAL_PATH)
+    material = asset_tools.create_asset(
+        asset_name=name,
+        package_path=MATERIAL_PATH,
+        asset_class=unreal.Material,
+        factory=unreal.MaterialFactoryNew()
+    )
+    material.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
+    material.set_editor_property("two_sided", True)
+
+    fog_color = color or unreal.LinearColor(0.2, 0.35, 0.5, 1.0)
+    base = unreal.MaterialEditingLibrary.create_material_expression(
+        material,
+        unreal.MaterialExpressionConstant3Vector
+    )
+    base.constant = fog_color
+    unreal.MaterialEditingLibrary.connect_material_property(
+        base, "", unreal.MaterialProperty.MP_BASE_COLOR
+    )
+
+    opacity_expr = unreal.MaterialEditingLibrary.create_material_expression(
+        material,
+        unreal.MaterialExpressionConstant
+    )
+    opacity_expr.r = opacity
+    depth_fade = unreal.MaterialEditingLibrary.create_material_expression(
+        material,
+        unreal.MaterialExpressionDepthFade
+    )
+    depth_fade.set_editor_property("fade_distance", 1200.0)
+    unreal.MaterialEditingLibrary.connect_material_expressions(opacity_expr, "", depth_fade, "InOpacity")
+    unreal.MaterialEditingLibrary.connect_material_property(
+        depth_fade, "", unreal.MaterialProperty.MP_OPACITY
+    )
+
+    unreal.MaterialEditingLibrary.recompile_material(material)
+    unreal.EditorAssetLibrary.save_asset(mat_path)
+    log(f"Created fog sheet material {mat_path}")
     return material
 
 def ensure_lifelike_grass_material(name="M_UAT_Grass_Lifelike"):
@@ -2063,6 +2329,41 @@ def main():
         snapshot_log_to_file()
         return
 
+    if COMMAND == "replace_emissive_with_grey":
+        replace_emissive_with_grey()
+        snapshot_log_to_file()
+        return
+
+    if COMMAND == "set_floating_orbs_emissive":
+        set_floating_orbs_emissive()
+        snapshot_log_to_file()
+        return
+
+    if COMMAND == "scale_all_lights":
+        scale_all_lights()
+        snapshot_log_to_file()
+        return
+
+    if COMMAND == "add_ground_fog":
+        add_ground_fog_layer()
+        snapshot_log_to_file()
+        return
+
+    if COMMAND == "boost_fog":
+        boost_fog_visibility()
+        snapshot_log_to_file()
+        return
+
+    if COMMAND == "raise_fog":
+        raise_fog_layer()
+        snapshot_log_to_file()
+        return
+
+    if COMMAND == "spawn_fog_sheets":
+        spawn_fog_sheets()
+        snapshot_log_to_file()
+        return
+
     if COMMAND == "spawn_marker":
         spawn_marker_near_camera()
         snapshot_log_to_file()
@@ -2070,6 +2371,11 @@ def main():
 
     if COMMAND == "spawn_red_lights":
         spawn_red_lights_near_camera()
+        snapshot_log_to_file()
+        return
+
+    if COMMAND == "spawn_floating_spheres":
+        spawn_floating_spheres()
         snapshot_log_to_file()
         return
     if COMMAND == "spawn_rotating_test_cube":
