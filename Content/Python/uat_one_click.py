@@ -132,6 +132,13 @@ def run_command_once(command_name):
 
 def delete_codex_levels():
     try:
+        # Avoid deleting the currently loaded Codex level to prevent editor asserts.
+        current_world = unreal.EditorLevelLibrary.get_editor_world()
+        current_path = current_world.get_path_name() if current_world else ""
+        if current_path.startswith(f"{CODEX_LEVEL_DIR}/"):
+            unreal.log_warning("[UAT] Skipping Codex level delete because the map is currently loaded.")
+            return
+
         if unreal.EditorAssetLibrary.does_directory_exist(CODEX_LEVEL_DIR):
             unreal.EditorAssetLibrary.delete_directory(CODEX_LEVEL_DIR)
         unreal.EditorAssetLibrary.make_directory(CODEX_LEVEL_DIR)
@@ -623,13 +630,18 @@ def _build_scifi_landscape_level_impl():
             strips = 2 if random.random() > 0.35 else 1
             spawn_tower(loc, footprint, height, strips=strips, hue_shift=random.random() > 0.65)
 
-    # distant horizon glow lights
-    for i in range(16):
-        loc = unreal.Vector(random.uniform(-3400.0, 3400.0), random.uniform(-3400.0, 3400.0), random.uniform(520.0, 1150.0))
+    # distant horizon glow lights (lined perimeter)
+    ring_radius = 3200.0
+    ring_height = 720.0
+    ring_count = 16
+    for i in range(ring_count):
+        ang = (360.0 / ring_count) * i
+        rad = math.radians(ang)
+        loc = unreal.Vector(math.cos(rad) * ring_radius, math.sin(rad) * ring_radius, ring_height)
         glow = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.PointLight, loc)
         lcomp = glow.get_component_by_class(unreal.PointLightComponent)
         if lcomp:
-            lcomp.set_editor_property("intensity", random.uniform(9000.0, 16000.0))
+            lcomp.set_editor_property("intensity", 12000.0)
             set_light_color_safe(lcomp, unreal.LinearColor(0.05, 0.82, 1.0, 1.0))
 
     # elevated sky bridges
@@ -678,18 +690,24 @@ def _build_scifi_landscape_level_impl():
     scomp.set_world_scale3d(unreal.Vector(1.5, 0.2, 1.0))
     sign.set_actor_rotation(unreal.Rotator(0.0, 20.0, 0.0), teleport_physics=True)
 
-    # foggy mood lights
-    for i in range(8):
-        loc = unreal.Vector(random.uniform(-900.0, 900.0), random.uniform(-900.0, 900.0), random.uniform(200.0, 850.0))
+    # foggy mood lights (aligned inner ring)
+    inner_ring_radius = 1200.0
+    inner_ring_height = 520.0
+    for i in range(10):
+        ang = (360.0 / 10) * i
+        rad = math.radians(ang)
+        loc = unreal.Vector(math.cos(rad) * inner_ring_radius, math.sin(rad) * inner_ring_radius, inner_ring_height)
         light = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.PointLight, loc)
         lcomp = light.get_component_by_class(unreal.PointLightComponent)
         if lcomp:
-            lcomp.set_editor_property("intensity", random.uniform(4000.0, 8000.0))
+            lcomp.set_editor_property("intensity", 5200.0)
             set_light_color_safe(lcomp, unreal.LinearColor(0.0, 0.75, 1.0, 1.0))
 
-    # red accent lights near foreground
-    for i in range(4):
-        loc = unreal.Vector(-1400.0 + i * 150.0, -300.0 + i * 120.0, 200.0)
+    # red accent lights (aligned quarter ring)
+    for i in range(6):
+        ang = 300.0 + (10.0 * i)
+        rad = math.radians(ang)
+        loc = unreal.Vector(math.cos(rad) * 1500.0, math.sin(rad) * 1500.0, 240.0)
         light = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.PointLight, loc)
         lcomp = light.get_component_by_class(unreal.PointLightComponent)
         if lcomp:
@@ -703,15 +721,20 @@ def _build_scifi_landscape_level_impl():
         fog_comp.set_editor_property("fog_density", 0.05)
         fog_comp.set_editor_property("fog_height_falloff", 0.02)
 
-    # floating neon signs (cyan/magenta) with companion lights
-    for i in range(22):
-        loc = unreal.Vector(random.uniform(-2200.0, 2200.0), random.uniform(-2200.0, 2200.0), random.uniform(240.0, 1200.0))
+    # floating neon signs (cyan/magenta) with companion lights aligned on perimeter
+    sign_radius = 2000.0
+    sign_height = 680.0
+    sign_count = 18
+    for i in range(sign_count):
+        ang = (360.0 / sign_count) * i
+        rad = math.radians(ang)
+        loc = unreal.Vector(math.cos(rad) * sign_radius, math.sin(rad) * sign_radius, sign_height + random.uniform(-120.0, 120.0))
         sign_actor = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.StaticMeshActor, loc)
         comp = sign_actor.get_component_by_class(unreal.StaticMeshComponent)
         comp.set_static_mesh(plane)
         comp.set_material(0, magenta if i % 2 == 0 else cyan)
         comp.set_world_scale3d(unreal.Vector(random.uniform(1.6, 3.4), 0.35, 1.0))
-        sign_actor.set_actor_rotation(unreal.Rotator(0.0, random.uniform(0.0, 360.0), random.uniform(-5.0, 5.0)), teleport_physics=True)
+        sign_actor.set_actor_rotation(unreal.Rotator(0.0, ang + 90.0, random.uniform(-5.0, 5.0)), teleport_physics=True)
         sign_actor.set_actor_label(f"NeonSign_{i}")
         sign_light = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.PointLight, loc + unreal.Vector(0.0, 0.0, 160.0))
         lcomp = sign_light.get_component_by_class(unreal.PointLightComponent)
@@ -767,7 +790,12 @@ def _rotate_tick(delta_seconds):
 
     alive = []
     for actor in _rotating_cubes:
-        if not unreal.SystemLibrary.is_valid(actor):
+        if actor is None:
+            continue
+        try:
+            if not unreal.SystemLibrary.is_valid(actor):
+                continue
+        except Exception:
             continue
         rot = actor.get_actor_rotation()
         rot.yaw += CUBE_ROTATE_DEG_PER_SEC * delta_seconds
