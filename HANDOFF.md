@@ -82,6 +82,7 @@ Log files:
   - Saved/Automation/uat_log_snapshot.txt (full snapshot)
 
 Changelog (recent):
+  - 2025-12-29: Added outliner organizer command (folders by category + misc buckets; parents vehicle lights) and updated overview/showcase labeling.
   - 2025-12-29: Added reference showcase (car/drone/roaming light/tower/sign/bridge with labels + lights) and movement guard logging; rebuild places showcase near origin.
   - 2025-12-28: Added safety guards (skip deleting Codex levels when loaded; rotate_tick skips dead actors) and aligned/perimeter lighting for Codex_Scifi_Landscape; rebuilt successfully.
   - 2025-12-28: Added rotating red test cube helper/command (spawn_rotating_test_cube) to verify tick; confirmed visible in editor.

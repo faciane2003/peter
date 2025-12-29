@@ -495,7 +495,7 @@ def _ensure_move_tick():
 
 def _push_moving(actor, velocity, meta=None):
     global _moving_actors
-    if not unreal.SystemLibrary.is_valid(actor):
+    if actor is None:
         return
     vel = unreal.Vector(velocity.x, velocity.y, velocity.z)
     _moving_actors.append((actor, vel, meta))
@@ -551,6 +551,12 @@ def _find_actor_by_label(label):
         if actor and actor.get_actor_label() == label:
             return actor
     return None
+
+def _set_folder(actor, folder_name):
+    try:
+        actor.set_folder_path(unreal.Name(folder_name))
+    except Exception:
+        pass
 
 def _spawn_reference_showcase(base_loc, cyan, magenta, base_mat):
     """Place representative assets with labels for quick visual selection."""
@@ -689,6 +695,13 @@ def spawn_debug_showcase():
 
     log(f"Debug showcase spawned. Moving actors={len(_moving_actors)}")
 
+def stop_motion():
+    """Clear moving actors and stop move tick."""
+    global _moving_actors
+    _moving_actors.clear()
+    _stop_move_tick()
+    log("Stopped move tick and cleared moving actors")
+
 def setup_overview_plane():
     """Decorate ov_plane and overview_cube*/ov_text* with labels and lights."""
     cyan = ensure_emissive_material("M_UAT_Scifi_Cyan", unreal.LinearColor(0.0, 0.75, 1.0, 1.0), emissive_boost=12.0)
@@ -734,6 +747,70 @@ def setup_overview_plane():
                 _spawn_text_label(loc + unreal.Vector(0.0, 0.0, 220.0), label, color=text_color, size=48.0)
 
     log("Overview plane decorated with labels, lights, and materials.")
+
+def organize_outliner():
+    """Group scene actors into Outliner folders and parent vehicle lights."""
+    actors = list(unreal.EditorLevelLibrary.get_all_level_actors() or [])
+    label_map = {a.get_actor_label(): a for a in actors if a}
+
+    def attach_light(light_label_prefix, target_label_prefix):
+        for label, actor in label_map.items():
+            if not label.startswith(light_label_prefix):
+                continue
+            suffix = label.removeprefix(light_label_prefix)
+            target_label = f"{target_label_prefix}{suffix}"
+            target = label_map.get(target_label)
+            if target:
+                try:
+                    actor.attach_to_actor(target, unreal.AttachmentTransformRules.keep_world_transform)
+                except Exception:
+                    pass
+
+    for actor in actors:
+        if not actor:
+            continue
+        label = actor.get_actor_label()
+        lname = label.lower()
+
+        if lname.startswith("water") or "ground" in lname or "plane" in lname:
+            _set_folder(actor, "Environment")
+        elif isinstance(actor, unreal.DirectionalLight) or isinstance(actor, unreal.SkyLight) or isinstance(actor, unreal.ExponentialHeightFog):
+            _set_folder(actor, "Environment")
+        elif lname.startswith("scifitower") or "tower" in lname:
+            _set_folder(actor, "Buildings")
+        elif lname.startswith("bridge") or lname.startswith("highway"):
+            _set_folder(actor, "Bridges_And_Highways")
+        elif "sign" in lname or "billboard" in lname:
+            _set_folder(actor, "Signs_And_Billboards")
+        elif lname.startswith("car"):
+            _set_folder(actor, "Vehicles")
+        elif "drone" in lname:
+            _set_folder(actor, "Drones")
+        elif "movinglight" in lname or "glow" in lname:
+            _set_folder(actor, "FX_Lights")
+        elif lname.startswith("showcase") or lname.startswith("ov_") or lname.startswith("overview_"):
+            _set_folder(actor, "Showcase")
+        elif lname.startswith("debug") or lname.startswith("test"):
+            _set_folder(actor, "Debug")
+        else:
+            # fallback buckets
+            cls_name = actor.get_class().get_name().lower()
+            if (
+                isinstance(actor, unreal.PointLight)
+                or isinstance(actor, unreal.SpotLight)
+                or isinstance(actor, unreal.RectLight)
+                or "light" in cls_name
+            ):
+                _set_folder(actor, "Misc_Lights")
+            elif isinstance(actor, unreal.StaticMeshActor):
+                _set_folder(actor, "Misc_StaticMesh")
+            else:
+                _set_folder(actor, "Misc_Uncategorized")
+
+    attach_light("CarLight_", "Car_")
+    attach_light("DroneLight_", "Drone_")
+
+    log("Organized Outliner folders and parented vehicle lights.")
 
 def _build_scifi_landscape_level_impl():
     towers_spawned = 0
@@ -1000,11 +1077,6 @@ def _rotate_tick(delta_seconds):
     for actor in _rotating_cubes:
         if actor is None:
             continue
-        try:
-            if not unreal.SystemLibrary.is_valid(actor):
-                continue
-        except Exception:
-            continue
         rot = actor.get_actor_rotation()
         rot.yaw += CUBE_ROTATE_DEG_PER_SEC * delta_seconds
         actor.set_actor_rotation(rot, teleport_physics=True)
@@ -1026,63 +1098,79 @@ def _move_tick(delta_seconds):
         _stop_move_tick()
         return
 
-    _move_time_accum += delta_seconds
-    _move_debug_counter += 1
-    alive = []
-    for actor, vel, meta in _moving_actors:
-        if not unreal.SystemLibrary.is_valid(actor):
-            continue
-        loc = actor.get_actor_location()
-        vel_mut = unreal.Vector(vel.x, vel.y, vel.z)
-        loc += vel_mut * delta_seconds
+    try:
+        _move_time_accum += delta_seconds
+        _move_debug_counter += 1
+        alive = []
+        for actor, vel, meta in _moving_actors:
+            if actor is None:
+                continue
+            try:
+                loc = actor.get_actor_location()
+            except Exception:
+                continue
+            vel_mut = unreal.Vector(vel.x, vel.y, vel.z)
+            loc += vel_mut * delta_seconds
 
-        if abs(loc.x) > _MOVE_BOUNDS.x:
-            vel_mut.x *= -1.0
-            loc.x = max(min(loc.x, _MOVE_BOUNDS.x), -_MOVE_BOUNDS.x)
-        if abs(loc.y) > _MOVE_BOUNDS.y:
-            vel_mut.y *= -1.0
-            loc.y = max(min(loc.y, _MOVE_BOUNDS.y), -_MOVE_BOUNDS.y)
-        if loc.z < _MOVE_Z_MIN or loc.z > _MOVE_BOUNDS.z:
-            vel_mut.z *= -1.0
-            loc.z = min(max(loc.z, _MOVE_Z_MIN), _MOVE_BOUNDS.z)
+            if abs(loc.x) > _MOVE_BOUNDS.x:
+                vel_mut.x *= -1.0
+                loc.x = max(min(loc.x, _MOVE_BOUNDS.x), -_MOVE_BOUNDS.x)
+            if abs(loc.y) > _MOVE_BOUNDS.y:
+                vel_mut.y *= -1.0
+                loc.y = max(min(loc.y, _MOVE_BOUNDS.y), -_MOVE_BOUNDS.y)
+            if loc.z < _MOVE_Z_MIN or loc.z > _MOVE_BOUNDS.z:
+                vel_mut.z *= -1.0
+                loc.z = min(max(loc.z, _MOVE_Z_MIN), _MOVE_BOUNDS.z)
 
-        if random.random() < 0.02:
-            vel_mut.x += random.uniform(-30.0, 30.0)
-            vel_mut.y += random.uniform(-30.0, 30.0)
-            vel_mut.z += random.uniform(-15.0, 15.0)
+            if random.random() < 0.02:
+                vel_mut.x += random.uniform(-30.0, 30.0)
+                vel_mut.y += random.uniform(-30.0, 30.0)
+                vel_mut.z += random.uniform(-15.0, 15.0)
 
-        actor.set_actor_location(loc, sweep=False, teleport=True)
+            try:
+                actor.set_actor_location(loc, sweep=False, teleport=True)
+            except Exception:
+                continue
 
-        if meta:
-            lcomp = meta.get("light_comp")
-            if lcomp and unreal.SystemLibrary.is_valid(lcomp.get_owner()):
-                base_intensity = meta.get("base_intensity", lcomp.get_editor_property("intensity"))
-                phase = meta.get("phase", 0.0)
-                hue_speed = meta.get("hue_speed", 0.5)
-                t = _move_time_accum + phase
-                osc = 0.65 + 0.45 * math.sin(t * 1.35)
-                try:
-                    lcomp.set_editor_property("intensity", base_intensity * osc)
-                except Exception:
-                    pass
-                color_a = meta.get("color_a")
-                color_b = meta.get("color_b", color_a)
-                if color_a and color_b:
-                    blend = 0.5 + 0.5 * math.sin(t * hue_speed)
-                    new_color = unreal.LinearColor(
-                        color_a.r * (1.0 - blend) + color_b.r * blend,
-                        color_a.g * (1.0 - blend) + color_b.g * blend,
-                        color_a.b * (1.0 - blend) + color_b.b * blend,
-                        1.0
-                    )
-                    set_light_color_safe(lcomp, new_color)
+            if meta:
+                lcomp = meta.get("light_comp")
+                owner_valid = False
+                if lcomp:
+                    try:
+                        owner = lcomp.get_owner()
+                        owner_valid = owner is not None
+                    except Exception:
+                        owner_valid = False
+                if lcomp and owner_valid:
+                    base_intensity = meta.get("base_intensity", lcomp.get_editor_property("intensity"))
+                    phase = meta.get("phase", 0.0)
+                    hue_speed = meta.get("hue_speed", 0.5)
+                    t = _move_time_accum + phase
+                    osc = 0.65 + 0.45 * math.sin(t * 1.35)
+                    try:
+                        lcomp.set_editor_property("intensity", base_intensity * osc)
+                    except Exception:
+                        pass
+                    color_a = meta.get("color_a")
+                    color_b = meta.get("color_b", color_a)
+                    if color_a and color_b:
+                        blend = 0.5 + 0.5 * math.sin(t * hue_speed)
+                        new_color = unreal.LinearColor(
+                            color_a.r * (1.0 - blend) + color_b.r * blend,
+                            color_a.g * (1.0 - blend) + color_b.g * blend,
+                            color_a.b * (1.0 - blend) + color_b.b * blend,
+                            1.0
+                        )
+                        set_light_color_safe(lcomp, new_color)
 
-        alive.append((actor, vel_mut, meta))
-    _moving_actors = alive
-    if _move_debug_counter % 120 == 0:
-        log(f"Move tick active: {len(_moving_actors)} actors")
-    if not _moving_actors:
-        _stop_move_tick()
+            alive.append((actor, vel_mut, meta))
+        _moving_actors = alive
+        if _move_debug_counter % 120 == 0:
+            log(f"Move tick active: {len(_moving_actors)} actors")
+        if not _moving_actors:
+            _stop_move_tick()
+    except Exception as exc:
+        log(f"Move tick suppressed error: {exc}")
 
 # ============================================================
 # MATERIALS (STABLE UE5 IMPLEMENTATION)
@@ -1694,6 +1782,15 @@ def main():
         snapshot_log_to_file()
         return
 
+    if COMMAND == "stop_motion":
+        stop_motion()
+        snapshot_log_to_file()
+        return
+
+    if COMMAND == "organize_outliner":
+        organize_outliner()
+        snapshot_log_to_file()
+        return
     if COMMAND == "spawn_rotating_test_cube":
         spawn_rotating_test_cube()
         log("Spawned rotating test cube above city")
