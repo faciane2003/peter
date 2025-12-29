@@ -859,6 +859,36 @@ def spawn_crowd(count=20):
         spawned += 1
     log(f"Spawned crowd actors: {spawned}")
 
+def spawn_car_placeholders(count=18):
+    """Spawn simple car placeholders moving around the city."""
+    plane = unreal.EditorAssetLibrary.load_asset(PLANE_MESH_PATH)
+    if not plane:
+        unreal.log_error(f"[UAT] Plane mesh not found: {PLANE_MESH_PATH}")
+        return
+    car_mat = ensure_emissive_material("M_UAT_Scifi_Car", unreal.LinearColor(0.1, 0.8, 1.0, 1.0), emissive_boost=8.0)
+    radius = 1800.0
+    base_z = 260.0
+    for i in range(count):
+        angle = math.radians((360.0 / count) * i)
+        start = unreal.Vector(
+            math.cos(angle) * radius,
+            math.sin(angle) * radius,
+            base_z + random.uniform(-40.0, 40.0)
+        )
+        tangent = unreal.Vector(-math.sin(angle), math.cos(angle), 0.0)
+        vel = tangent * random.uniform(200.0, 360.0)
+        actor = _spawn_moving_actor(
+            plane,
+            car_mat,
+            start,
+            vel,
+            unreal.Vector(0.9, 2.6, 0.32),
+            f"Car_Placeholder_{i+1}"
+        )
+        if actor:
+            _set_folder(actor, "Vehicles")
+    log(f"Spawned car placeholders: {count}")
+
 def setup_overview_plane():
     """Decorate ov_plane and overview_cube*/ov_text* with labels and lights."""
     cyan = ensure_emissive_material("M_UAT_Scifi_Cyan", unreal.LinearColor(0.0, 0.75, 1.0, 1.0), emissive_boost=12.0)
@@ -2443,6 +2473,11 @@ def main():
 
     if COMMAND == "spawn_crowd":
         spawn_crowd()
+        snapshot_log_to_file()
+        return
+
+    if COMMAND == "spawn_car_placeholders":
+        spawn_car_placeholders()
         snapshot_log_to_file()
         return
     if COMMAND == "spawn_rotating_test_cube":
