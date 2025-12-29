@@ -732,6 +732,38 @@ def spawn_marker_near_camera():
     _spawn_text_label(spawn_loc + unreal.Vector(0.0, 0.0, 220.0), "Marker")
     log(f"Spawned marker at {spawn_loc}")
 
+def spawn_red_lights_near_camera():
+    """Spawn a main light and six red companions near the current viewport camera."""
+    cam_loc = unreal.Vector(0.0, 0.0, 200.0)
+    cam_rot = unreal.Rotator(0.0, 0.0, 0.0)
+    try:
+        loc_out = unreal.Vector()
+        rot_out = unreal.Rotator()
+        fov = 0.0
+        unreal.EditorLevelLibrary.get_level_viewport_camera_info(loc_out, rot_out, fov)
+        cam_loc = loc_out
+        cam_rot = rot_out
+    except Exception:
+        pass
+    forward = cam_rot.get_forward_vector()
+    base = cam_loc + forward * 600.0 + unreal.Vector(0.0, 0.0, 140.0)
+
+    def make_light(loc, label, intensity, color, attenuation=900.0):
+        light = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.PointLight, loc)
+        comp = light.get_component_by_class(unreal.PointLightComponent)
+        if comp:
+            comp.set_editor_property("intensity", intensity)
+            comp.set_editor_property("attenuation_radius", attenuation)
+            set_light_color_safe(comp, color)
+        light.set_actor_label(label)
+        _set_folder(light, "Showcase")
+
+    make_light(base, "Line_Light_Main", 4200.0, unreal.LinearColor(0.8, 0.7, 0.6, 1.0))
+    for i in range(6):
+        offset = unreal.Vector((i - 3) * 100.0, 0.0, 80.0 + (i % 2) * 60.0)
+        make_light(base + offset, f"Line_Light_Red_{i+1}", 3200.0, unreal.LinearColor(1.0, 0.15, 0.15, 1.0), attenuation=700.0)
+    log(f"Spawned red light cluster near camera at {base}")
+
 def setup_overview_plane():
     """Decorate ov_plane and overview_cube*/ov_text* with labels and lights."""
     cyan = ensure_emissive_material("M_UAT_Scifi_Cyan", unreal.LinearColor(0.0, 0.75, 1.0, 1.0), emissive_boost=12.0)
@@ -810,6 +842,17 @@ def spawn_asset_line(base_loc, step=unreal.Vector(0.0, 400.0, 0.0)):
             light.set_actor_label("Line_Light")
             _set_folder(light, "Showcase")
             _spawn_text_label(pos + unreal.Vector(0.0, 0.0, 240.0), label)
+            # add floating red companions
+            for i in range(6):
+                offset = unreal.Vector(0.0, (i - 2.5) * 90.0, 260.0 + (i % 2) * 60.0)
+                rlight = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.PointLight, pos + offset)
+                rlcomp = rlight.get_component_by_class(unreal.PointLightComponent)
+                if rlcomp:
+                    rlcomp.set_editor_property("intensity", 3200.0)
+                    rlcomp.set_editor_property("attenuation_radius", 600.0)
+                    set_light_color_safe(rlcomp, unreal.LinearColor(1.0, 0.15, 0.15, 1.0))
+                rlight.set_actor_label(f"Line_Light_Red_{i+1}")
+                _set_folder(rlight, "Showcase")
             continue
         if not mesh:
             continue
@@ -2022,6 +2065,11 @@ def main():
 
     if COMMAND == "spawn_marker":
         spawn_marker_near_camera()
+        snapshot_log_to_file()
+        return
+
+    if COMMAND == "spawn_red_lights":
+        spawn_red_lights_near_camera()
         snapshot_log_to_file()
         return
     if COMMAND == "spawn_rotating_test_cube":

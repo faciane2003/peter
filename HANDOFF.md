@@ -82,6 +82,7 @@ Log files:
   - Saved/Automation/uat_log_snapshot.txt (full snapshot)
 
 Changelog (recent):
+  - 2025-12-29: Added spawn_red_lights (cluster near camera) and expanded lights_keep_three/matte replacement; reiterated visibility guidance (use Outliner labels).
   - 2025-12-29: Added replace_emissive_with_matte command to swap emissive materials to matte on all static meshes; lights_keep_three limits active lights to three.
   - 2025-12-29: Added spawn_marker command to drop a red sphere marker near the current camera; asset lineup moved closer and lights can be limited to showcase via lights_showcase_only.
   - 2025-12-29: Added outliner organizer command (folders by category + misc buckets; parents vehicle lights) and updated overview/showcase labeling.
