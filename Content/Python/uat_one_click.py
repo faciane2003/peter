@@ -558,6 +558,13 @@ def _set_folder(actor, folder_name):
     except Exception:
         pass
 
+def _load_first_asset(paths):
+    for path in paths:
+        asset = unreal.EditorAssetLibrary.load_asset(path)
+        if asset:
+            return asset
+    return None
+
 def _spawn_reference_showcase(base_loc, cyan, magenta, base_mat):
     """Place representative assets with labels for quick visual selection."""
     plane = unreal.EditorAssetLibrary.load_asset(PLANE_MESH_PATH)
@@ -796,6 +803,61 @@ def spawn_floating_spheres(count=5):
         if actor:
             _set_folder(actor, "FX_Lights")
     log(f"Spawned {count} floating spheres")
+
+def spawn_crowd(count=20):
+    """Spawn simple walking crowd using mannequin mesh if available."""
+    mesh = _load_first_asset([
+        "/Engine/Characters/Mannequins/Meshes/SK_Manny.SK_Manny",
+        "/Engine/Characters/Mannequins/Meshes/SK_Mannequin.SK_Mannequin",
+        "/Engine/Characters/Mannequins/Meshes/SK_Quinn.SK_Quinn",
+    ])
+    cube = unreal.EditorAssetLibrary.load_asset(CUBE_MESH_PATH)
+    base_range = 1400.0
+    min_z = 0.0
+    max_z = 10.0
+    spawned = 0
+    for i in range(count):
+        glow_color = unreal.LinearColor(
+            random.uniform(0.2, 1.0),
+            random.uniform(0.2, 1.0),
+            random.uniform(0.2, 1.0),
+            1.0
+        )
+        glow_mat = ensure_emissive_material(
+            f"M_UAT_CrowdGlow_{i+1}",
+            glow_color,
+            emissive_boost=6.0
+        )
+        start = unreal.Vector(
+            random.uniform(-base_range, base_range),
+            random.uniform(-base_range, base_range),
+            random.uniform(min_z, max_z)
+        )
+        vel = unreal.Vector(
+            random.uniform(-80.0, 80.0),
+            random.uniform(-80.0, 80.0),
+            0.0
+        )
+        if mesh:
+            actor = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.SkeletalMeshActor, start)
+            comp = actor.get_component_by_class(unreal.SkeletalMeshComponent)
+            if comp:
+                comp.set_skeletal_mesh(mesh)
+                comp.set_world_scale3d(unreal.Vector(1.0, 1.0, 1.0))
+                comp.set_material(0, glow_mat)
+        elif cube:
+            actor = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.StaticMeshActor, start)
+            comp = actor.get_component_by_class(unreal.StaticMeshComponent)
+            comp.set_static_mesh(cube)
+            comp.set_world_scale3d(unreal.Vector(0.35, 0.35, 1.7))
+            comp.set_material(0, glow_mat)
+        else:
+            continue
+        actor.set_actor_label(f"Crowd_{i+1}")
+        _set_folder(actor, "Crowd")
+        _push_moving(actor, vel)
+        spawned += 1
+    log(f"Spawned crowd actors: {spawned}")
 
 def setup_overview_plane():
     """Decorate ov_plane and overview_cube*/ov_text* with labels and lights."""
@@ -2376,6 +2438,11 @@ def main():
 
     if COMMAND == "spawn_floating_spheres":
         spawn_floating_spheres()
+        snapshot_log_to_file()
+        return
+
+    if COMMAND == "spawn_crowd":
+        spawn_crowd()
         snapshot_log_to_file()
         return
     if COMMAND == "spawn_rotating_test_cube":
