@@ -702,6 +702,36 @@ def stop_motion():
     _stop_move_tick()
     log("Stopped move tick and cleared moving actors")
 
+def spawn_marker_near_camera():
+    """Spawn a large red sphere marker near the current viewport camera."""
+    sphere = unreal.EditorAssetLibrary.load_asset(SPHERE_MESH_PATH)
+    red_mat = ensure_emissive_material("M_UAT_Test_Red", unreal.LinearColor(1.0, 0.1, 0.1, 1.0), emissive_boost=6.0)
+    cam_loc = unreal.Vector(0.0, 0.0, 200.0)
+    cam_rot = unreal.Rotator(0.0, 0.0, 0.0)
+    try:
+        loc_out = unreal.Vector()
+        rot_out = unreal.Rotator()
+        fov = 0.0
+        unreal.EditorLevelLibrary.get_level_viewport_camera_info(loc_out, rot_out, fov)
+        cam_loc = loc_out
+        cam_rot = rot_out
+    except Exception:
+        pass
+
+    forward = cam_rot.get_forward_vector()
+    spawn_loc = cam_loc + forward * 600.0 + unreal.Vector(0.0, 0.0, 80.0)
+    marker = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.StaticMeshActor, spawn_loc)
+    comp = marker.get_component_by_class(unreal.StaticMeshComponent)
+    if sphere:
+        comp.set_static_mesh(sphere)
+    comp.set_world_scale3d(unreal.Vector(2.5, 2.5, 2.5))
+    if red_mat:
+        comp.set_material(0, red_mat)
+    marker.set_actor_label("Line_Marker_RedBall")
+    _set_folder(marker, "Showcase")
+    _spawn_text_label(spawn_loc + unreal.Vector(0.0, 0.0, 220.0), "Marker")
+    log(f"Spawned marker at {spawn_loc}")
+
 def setup_overview_plane():
     """Decorate ov_plane and overview_cube*/ov_text* with labels and lights."""
     cyan = ensure_emissive_material("M_UAT_Scifi_Cyan", unreal.LinearColor(0.0, 0.75, 1.0, 1.0), emissive_boost=12.0)
@@ -747,6 +777,68 @@ def setup_overview_plane():
                 _spawn_text_label(loc + unreal.Vector(0.0, 0.0, 220.0), label, color=text_color, size=48.0)
 
     log("Overview plane decorated with labels, lights, and materials.")
+
+def spawn_asset_line(base_loc, step=unreal.Vector(0.0, 400.0, 0.0)):
+    """Place one static sample of each major asset type with labels (no animation)."""
+    plane = unreal.EditorAssetLibrary.load_asset(PLANE_MESH_PATH)
+    cube = unreal.EditorAssetLibrary.load_asset(CUBE_MESH_PATH)
+    sphere = unreal.EditorAssetLibrary.load_asset(SPHERE_MESH_PATH)
+    base_mat = ensure_material("M_UAT_Scifi_Base", unreal.LinearColor(0.05, 0.08, 0.12, 1.0))
+    cyan = ensure_emissive_material("M_UAT_Scifi_Cyan", unreal.LinearColor(0.0, 0.75, 1.0, 1.0), emissive_boost=12.0)
+    magenta = ensure_emissive_material("M_UAT_Scifi_Magenta", unreal.LinearColor(1.0, 0.1, 0.65, 1.0), emissive_boost=12.0)
+    car_mat = ensure_emissive_material("M_UAT_Scifi_Car", unreal.LinearColor(0.1, 0.8, 1.0, 1.0), emissive_boost=14.0)
+    drone_mat = ensure_emissive_material("M_UAT_Scifi_Drone", unreal.LinearColor(0.0, 0.9, 0.8, 1.0), emissive_boost=10.0)
+
+    items = [
+        ("Tower", cube, base_mat, unreal.Vector(1.6, 1.2, 9.0)),
+        ("Bridge / Highway", plane, base_mat, unreal.Vector(3.2, 0.5, 0.2)),
+        ("Sign / Billboard", plane, magenta, unreal.Vector(1.8, 0.2, 1.0)),
+        ("Car", plane, car_mat, unreal.Vector(0.9, 2.6, 0.32)),
+        ("Drone", sphere, drone_mat, unreal.Vector(0.55, 0.55, 0.55)),
+        ("Light", None, None, None),
+    ]
+
+    for idx, (label, mesh, mat, scale) in enumerate(items):
+        pos = base_loc + step * idx
+        if label == "Light":
+            light = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.PointLight, pos + unreal.Vector(0.0, 0.0, 140.0))
+            lcomp = light.get_component_by_class(unreal.PointLightComponent)
+            if lcomp:
+                lcomp.set_editor_property("intensity", 4200.0)
+                lcomp.set_editor_property("attenuation_radius", 900.0)
+                set_light_color_safe(lcomp, unreal.LinearColor(0.8, 0.7, 0.6, 1.0))
+            light.set_actor_label("Line_Light")
+            _set_folder(light, "Showcase")
+            _spawn_text_label(pos + unreal.Vector(0.0, 0.0, 240.0), label)
+            continue
+        if not mesh:
+            continue
+        actor = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.StaticMeshActor, pos)
+        comp = actor.get_component_by_class(unreal.StaticMeshComponent)
+        comp.set_static_mesh(mesh)
+        if scale:
+            comp.set_world_scale3d(scale)
+        if mat:
+            comp.set_material(0, mat)
+        actor.set_actor_label(f"Line_{label.replace(' ', '')}")
+        _set_folder(actor, "Showcase")
+        _spawn_text_label(pos + unreal.Vector(0.0, 0.0, 240.0), label)
+
+    # Big red ball marker at start of line
+    marker_pos = base_loc + unreal.Vector(-220.0, 0.0, 120.0)
+    red_mat = ensure_emissive_material("M_UAT_Test_Red", unreal.LinearColor(1.0, 0.1, 0.1, 1.0), emissive_boost=6.0)
+    marker = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.StaticMeshActor, marker_pos)
+    mcomp = marker.get_component_by_class(unreal.StaticMeshComponent)
+    if sphere:
+        mcomp.set_static_mesh(sphere)
+    mcomp.set_world_scale3d(unreal.Vector(2.5, 2.5, 2.5))
+    if red_mat:
+        mcomp.set_material(0, red_mat)
+    marker.set_actor_label("Line_Marker_RedBall")
+    _set_folder(marker, "Showcase")
+    _spawn_text_label(marker_pos + unreal.Vector(0.0, 0.0, 220.0), "Marker")
+
+    log(f"Asset line spawned at {base_loc} with {len(items)} items.")
 
 def organize_outliner():
     """Group scene actors into Outliner folders and parent vehicle lights."""
@@ -811,6 +903,45 @@ def organize_outliner():
     attach_light("DroneLight_", "Drone_")
 
     log("Organized Outliner folders and parented vehicle lights.")
+
+def lights_showcase_only():
+    """Turn off all point/spot/rect lights except the lineup/showcase lights."""
+    actors = list(unreal.EditorLevelLibrary.get_all_level_actors() or [])
+    kept = 0
+    off = 0
+    for actor in actors:
+        if not actor:
+            continue
+        label = actor.get_actor_label()
+        cls = actor.get_class()
+        cname = cls.get_name().lower() if cls else ""
+        is_light = (
+            isinstance(actor, unreal.PointLight) or
+            isinstance(actor, unreal.SpotLight) or
+            isinstance(actor, unreal.RectLight) or
+            "light" in cname
+        )
+        if not is_light:
+            continue
+        keep = label.startswith("Line_") or label.startswith("Showcase_") or label.startswith("Debug_")
+        comp = None
+        if isinstance(actor, unreal.PointLight):
+            comp = actor.get_component_by_class(unreal.PointLightComponent)
+        elif isinstance(actor, unreal.SpotLight):
+            comp = actor.get_component_by_class(unreal.SpotLightComponent)
+        elif isinstance(actor, unreal.RectLight):
+            comp = actor.get_component_by_class(unreal.RectLightComponent)
+        if keep:
+            kept += 1
+            continue
+        if comp:
+            try:
+                comp.set_editor_property("intensity", 0.0)
+                comp.set_editor_property("visibility", False)
+            except Exception:
+                pass
+        off += 1
+    log(f"Lights limited to showcase: kept={kept}, turned_off={off}")
 
 def _build_scifi_landscape_level_impl():
     towers_spawned = 0
@@ -1054,6 +1185,7 @@ def _build_scifi_landscape_level_impl():
     # Reference showcase near origin for quick selection
     _spawn_reference_showcase(unreal.Vector(-800.0, -2600.0, 0.0), cyan, magenta, base)
     setup_overview_plane()
+    spawn_asset_line(unreal.Vector(600.0, -1400.0, 20.0), step=unreal.Vector(0.0, 320.0, 0.0))
 
     # Reference showcase near origin for quick selection
     _spawn_reference_showcase(unreal.Vector(-800.0, -2600.0, 0.0), cyan, magenta, base)
@@ -1789,6 +1921,16 @@ def main():
 
     if COMMAND == "organize_outliner":
         organize_outliner()
+        snapshot_log_to_file()
+        return
+
+    if COMMAND == "lights_showcase_only":
+        lights_showcase_only()
+        snapshot_log_to_file()
+        return
+
+    if COMMAND == "spawn_marker":
+        spawn_marker_near_camera()
         snapshot_log_to_file()
         return
     if COMMAND == "spawn_rotating_test_cube":
