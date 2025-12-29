@@ -943,6 +943,87 @@ def lights_showcase_only():
         off += 1
     log(f"Lights limited to showcase: kept={kept}, turned_off={off}")
 
+def lights_keep_three():
+    """Turn off all point/spot/rect lights except three (prefers Showcase/Line/Debug)."""
+    actors = list(unreal.EditorLevelLibrary.get_all_level_actors() or [])
+    lights = []
+    for actor in actors:
+        if not actor:
+            continue
+        cls = actor.get_class()
+        cname = cls.get_name().lower() if cls else ""
+        if (
+            isinstance(actor, unreal.PointLight)
+            or isinstance(actor, unreal.SpotLight)
+            or isinstance(actor, unreal.RectLight)
+            or "light" in cname
+        ):
+            lights.append(actor)
+
+    def priority(a):
+        lbl = a.get_actor_label().lower()
+        if lbl.startswith("line_") or lbl.startswith("showcase_") or lbl.startswith("debug_"):
+            return (0, lbl)
+        return (1, lbl)
+
+    lights.sort(key=priority)
+    keep = set(lights[:3])
+    kept = len(keep)
+    off = 0
+
+    for actor in lights:
+        if actor in keep:
+            continue
+        comp = None
+        if isinstance(actor, unreal.PointLight):
+            comp = actor.get_component_by_class(unreal.PointLightComponent)
+        elif isinstance(actor, unreal.SpotLight):
+            comp = actor.get_component_by_class(unreal.SpotLightComponent)
+        elif isinstance(actor, unreal.RectLight):
+            comp = actor.get_component_by_class(unreal.RectLightComponent)
+        if comp:
+            try:
+                comp.set_editor_property("intensity", 0.0)
+                comp.set_editor_property("visibility", False)
+            except Exception:
+                pass
+    off += 1
+
+    log(f"Lights limited to three: kept={kept}, turned_off={off}")
+
+def replace_emissive_with_matte():
+    """Swap emissive materials to matte base on all static mesh actors."""
+    emissive_names = {
+        "M_UAT_Scifi_Cyan",
+        "M_UAT_Scifi_Magenta",
+        "M_UAT_Scifi_Red",
+        "M_UAT_Scifi_Car",
+        "M_UAT_Scifi_Drone",
+        "M_UAT_Scifi_Water",
+        "M_UAT_Test_Red",
+    }
+    base_mat = ensure_material("M_UAT_Scifi_Base", unreal.LinearColor(0.05, 0.08, 0.12, 1.0))
+    swapped = 0
+    actors = list(unreal.EditorLevelLibrary.get_all_level_actors() or [])
+    for actor in actors:
+        if not isinstance(actor, unreal.StaticMeshActor):
+            continue
+        comp = actor.get_component_by_class(unreal.StaticMeshComponent)
+        if not comp:
+            continue
+        mats = comp.get_materials()
+        changed = False
+        for idx, m in enumerate(mats):
+            if not m:
+                continue
+            name = m.get_name()
+            if name in emissive_names:
+                comp.set_material(idx, base_mat)
+                changed = True
+        if changed:
+            swapped += 1
+    log(f"Replaced emissive materials with matte on {swapped} actors")
+
 def _build_scifi_landscape_level_impl():
     towers_spawned = 0
     bridges_spawned = 0
@@ -1926,6 +2007,16 @@ def main():
 
     if COMMAND == "lights_showcase_only":
         lights_showcase_only()
+        snapshot_log_to_file()
+        return
+
+    if COMMAND == "lights_keep_three":
+        lights_keep_three()
+        snapshot_log_to_file()
+        return
+
+    if COMMAND == "replace_emissive_with_matte":
+        replace_emissive_with_matte()
         snapshot_log_to_file()
         return
 
