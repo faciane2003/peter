@@ -546,6 +546,12 @@ def _spawn_text_label(location, text, color=unreal.LinearColor(1.0, 1.0, 1.0, 1.
         comp.set_editor_property("world_size", size)
     return actor
 
+def _find_actor_by_label(label):
+    for actor in unreal.EditorLevelLibrary.get_all_level_actors():
+        if actor and actor.get_actor_label() == label:
+            return actor
+    return None
+
 def _spawn_reference_showcase(base_loc, cyan, magenta, base_mat):
     """Place representative assets with labels for quick visual selection."""
     plane = unreal.EditorAssetLibrary.load_asset(PLANE_MESH_PATH)
@@ -682,6 +688,52 @@ def spawn_debug_showcase():
     _spawn_text_label(roam_pos + unreal.Vector(0.0, 0.0, 200.0), "Roaming Light")
 
     log(f"Debug showcase spawned. Moving actors={len(_moving_actors)}")
+
+def setup_overview_plane():
+    """Decorate ov_plane and overview_cube*/ov_text* with labels and lights."""
+    cyan = ensure_emissive_material("M_UAT_Scifi_Cyan", unreal.LinearColor(0.0, 0.75, 1.0, 1.0), emissive_boost=12.0)
+    magenta = ensure_emissive_material("M_UAT_Scifi_Magenta", unreal.LinearColor(1.0, 0.1, 0.65, 1.0), emissive_boost=12.0)
+    base_mat = ensure_material("M_UAT_Scifi_Base", unreal.LinearColor(0.05, 0.08, 0.12, 1.0))
+
+    plane_actor = _find_actor_by_label("ov_plane")
+    if plane_actor:
+        comp = plane_actor.get_component_by_class(unreal.StaticMeshComponent)
+        if comp:
+            comp.set_material(0, base_mat)
+
+    labels = [
+        "Tower", "Sign / Billboard", "Bridge / Highway", "Car",
+        "Drone", "Roaming Light", "Showcase", "Placeholder"
+    ]
+    text_color = unreal.LinearColor(1.0, 0.95, 0.8, 1.0)
+
+    for i in range(8):
+        cube = _find_actor_by_label(f"overview_cube{i+1}")
+        text = _find_actor_by_label(f"ov_text{i+1}")
+        label = labels[i] if i < len(labels) else f"Item {i+1}"
+        if cube:
+            ccomp = cube.get_component_by_class(unreal.StaticMeshComponent)
+            if ccomp:
+                mat = cyan if i % 2 == 0 else magenta
+                ccomp.set_material(0, mat)
+            loc = cube.get_actor_location()
+            light = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.PointLight, loc + unreal.Vector(0.0, 0.0, 120.0))
+            lcomp = light.get_component_by_class(unreal.PointLightComponent)
+            if lcomp:
+                lcomp.set_editor_property("intensity", 4200.0)
+                lcomp.set_editor_property("attenuation_radius", 900.0)
+                set_light_color_safe(lcomp, unreal.LinearColor(1.0, 0.8, 0.6, 1.0))
+            if text:
+                tcomp = text.get_component_by_class(unreal.TextRenderComponent)
+                if tcomp:
+                    tcomp.set_editor_property("text", label)
+                    tcomp.set_editor_property("text_render_color", text_color.to_fcolor(True))
+                    tcomp.set_editor_property("world_size", 48.0)
+                text.set_actor_location(loc + unreal.Vector(0.0, 0.0, 220.0), teleport=True)
+            else:
+                _spawn_text_label(loc + unreal.Vector(0.0, 0.0, 220.0), label, color=text_color, size=48.0)
+
+    log("Overview plane decorated with labels, lights, and materials.")
 
 def _build_scifi_landscape_level_impl():
     towers_spawned = 0
@@ -921,6 +973,10 @@ def _build_scifi_landscape_level_impl():
         _spawn_moving_light(start + unreal.Vector(0.0, 0.0, 70.0), vel, random.uniform(5000.0, 9000.0), unreal.LinearColor(0.0, 0.9, 0.8, 1.0), unreal.LinearColor(1.0, 0.2, 0.7, 1.0), hue_speed=1.1, attenuation=900.0, label=f"DroneLight_{i}")
         if drone:
             drones_spawned += 1
+
+    # Reference showcase near origin for quick selection
+    _spawn_reference_showcase(unreal.Vector(-800.0, -2600.0, 0.0), cyan, magenta, base)
+    setup_overview_plane()
 
     # Reference showcase near origin for quick selection
     _spawn_reference_showcase(unreal.Vector(-800.0, -2600.0, 0.0), cyan, magenta, base)
