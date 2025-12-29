@@ -490,6 +490,7 @@ def build_scifi_landscape_level():
 def _ensure_move_tick():
     global _move_tick_handle
     if _move_tick_handle is None:
+        log("Registering move tick")
         _move_tick_handle = unreal.register_slate_post_tick_callback(_move_tick)
 
 def _push_moving(actor, velocity, meta=None):
@@ -533,6 +534,154 @@ def _spawn_moving_light(start, velocity, intensity, color_a, color_b=None, hue_s
         light.set_actor_label(label)
     _push_moving(light, velocity, meta)
     return light
+
+def _spawn_text_label(location, text, color=unreal.LinearColor(1.0, 1.0, 1.0, 1.0), size=48.0):
+    actor = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.TextRenderActor, location)
+    comp = actor.get_component_by_class(unreal.TextRenderComponent)
+    if comp:
+        comp.set_editor_property("text", text)
+        comp.set_editor_property("text_render_color", color.to_fcolor(True))
+        comp.set_editor_property("horizontal_alignment", unreal.HorizTextAligment.HTA_CENTER)
+        comp.set_editor_property("vertical_alignment", unreal.VertTextAligment.VTA_TextCenter)
+        comp.set_editor_property("world_size", size)
+    return actor
+
+def _spawn_reference_showcase(base_loc, cyan, magenta, base_mat):
+    """Place representative assets with labels for quick visual selection."""
+    plane = unreal.EditorAssetLibrary.load_asset(PLANE_MESH_PATH)
+    cube = unreal.EditorAssetLibrary.load_asset(CUBE_MESH_PATH)
+    sphere = unreal.EditorAssetLibrary.load_asset(SPHERE_MESH_PATH)
+
+    if not plane or not cube or not sphere:
+        unreal.log_warning("[UAT] Showcase skipped; missing primitive mesh")
+        return
+
+    car_mat = ensure_emissive_material("M_UAT_Scifi_Car", unreal.LinearColor(0.1, 0.8, 1.0, 1.0), emissive_boost=14.0)
+    drone_mat = ensure_emissive_material("M_UAT_Scifi_Drone", unreal.LinearColor(0.0, 0.9, 0.8, 1.0), emissive_boost=10.0)
+
+    # Ground pad
+    pad = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.StaticMeshActor, base_loc)
+    pcomp = pad.get_component_by_class(unreal.StaticMeshComponent)
+    pcomp.set_static_mesh(plane)
+    pcomp.set_world_scale3d(unreal.Vector(6.0, 6.0, 1.0))
+    pcomp.set_material(0, base_mat)
+    pad.set_actor_label("Showcase_Pad")
+
+    offsets = {
+        "Tower": unreal.Vector(-350.0, -200.0, 0.0),
+        "Sign": unreal.Vector(0.0, -200.0, 0.0),
+        "Bridge": unreal.Vector(350.0, -200.0, 0.0),
+        "Car": unreal.Vector(-200.0, 200.0, 0.0),
+        "Drone": unreal.Vector(0.0, 200.0, 0.0),
+        "Roaming Light": unreal.Vector(200.0, 200.0, 0.0),
+    }
+
+    # Tower sample
+    tpos = base_loc + offsets["Tower"]
+    tower = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.StaticMeshActor, tpos)
+    tcomp = tower.get_component_by_class(unreal.StaticMeshComponent)
+    tcomp.set_static_mesh(cube)
+    tcomp.set_material(0, base_mat)
+    tcomp.set_world_scale3d(unreal.Vector(1.2, 1.0, 8.0))
+    strip = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.StaticMeshActor, tpos + unreal.Vector(0.0, 90.0, 300.0))
+    scomp = strip.get_component_by_class(unreal.StaticMeshComponent)
+    scomp.set_static_mesh(cube)
+    scomp.set_material(0, cyan)
+    scomp.set_world_scale3d(unreal.Vector(0.12, 0.35, 4.0))
+    _spawn_text_label(tpos + unreal.Vector(0.0, 0.0, 500.0), "Tower")
+
+    # Sign sample
+    spos = base_loc + offsets["Sign"]
+    sign = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.StaticMeshActor, spos)
+    sc = sign.get_component_by_class(unreal.StaticMeshComponent)
+    sc.set_static_mesh(plane)
+    sc.set_world_scale3d(unreal.Vector(1.8, 0.2, 1.0))
+    sc.set_material(0, magenta)
+    sign.set_actor_rotation(unreal.Rotator(0.0, 20.0, 0.0), teleport_physics=True)
+    _spawn_text_label(spos + unreal.Vector(0.0, 0.0, 220.0), "Sign / Billboard", color=unreal.LinearColor(1.0, 0.2, 0.8, 1.0))
+
+    # Bridge sample
+    bpos = base_loc + offsets["Bridge"]
+    bridge = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.StaticMeshActor, bpos)
+    bcomp = bridge.get_component_by_class(unreal.StaticMeshComponent)
+    bcomp.set_static_mesh(plane)
+    bcomp.set_material(0, base_mat)
+    bcomp.set_world_scale3d(unreal.Vector(3.2, 0.5, 0.2))
+    rail = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.StaticMeshActor, bpos + unreal.Vector(0.0, 0.0, 40.0))
+    rcomp = rail.get_component_by_class(unreal.StaticMeshComponent)
+    rcomp.set_static_mesh(plane)
+    rcomp.set_material(0, cyan)
+    rcomp.set_world_scale3d(unreal.Vector(3.2, 0.08, 0.1))
+    _spawn_text_label(bpos + unreal.Vector(0.0, 0.0, 180.0), "Bridge / Highway")
+
+    # Car sample (moving)
+    car_pos = base_loc + offsets["Car"]
+    car_vel = unreal.Vector(260.0, 0.0, 0.0)
+    _spawn_moving_actor(plane, car_mat, car_pos, car_vel, unreal.Vector(0.9, 2.6, 0.32), "Showcase_Car")
+    _spawn_moving_light(car_pos + unreal.Vector(0.0, 0.0, 40.0), car_vel, 5200.0, unreal.LinearColor(0.2, 0.9, 1.0, 1.0), unreal.LinearColor(1.0, 0.3, 0.2, 1.0), hue_speed=0.7, attenuation=1000.0, label="Showcase_CarLight")
+    _spawn_text_label(car_pos + unreal.Vector(0.0, 0.0, 200.0), "Car (moving)")
+
+    # Drone sample (moving)
+    drone_pos = base_loc + offsets["Drone"] + unreal.Vector(0.0, 0.0, 120.0)
+    drone_vel = unreal.Vector(-160.0, 120.0, 40.0)
+    _spawn_moving_actor(sphere, drone_mat, drone_pos, drone_vel, unreal.Vector(0.55, 0.55, 0.55), "Showcase_Drone")
+    _spawn_moving_light(drone_pos + unreal.Vector(0.0, 0.0, 70.0), drone_vel, 4500.0, unreal.LinearColor(0.0, 0.9, 0.8, 1.0), unreal.LinearColor(1.0, 0.25, 0.7, 1.0), hue_speed=1.0, attenuation=800.0, label="Showcase_DroneLight")
+    _spawn_text_label(drone_pos + unreal.Vector(0.0, 0.0, 180.0), "Drone (moving)")
+
+    # Roaming light sample (moving)
+    rl_pos = base_loc + offsets["Roaming Light"] + unreal.Vector(0.0, 0.0, 80.0)
+    rl_vel = unreal.Vector(120.0, -160.0, 30.0)
+    _spawn_moving_light(rl_pos, rl_vel, 4200.0, unreal.LinearColor(0.05, 0.8, 1.0, 1.0), unreal.LinearColor(1.0, 0.2, 0.65, 1.0), hue_speed=0.8, attenuation=1100.0, label="Showcase_RoamLight")
+    _spawn_text_label(rl_pos + unreal.Vector(0.0, 0.0, 160.0), "Roaming Light (moving)")
+
+def spawn_debug_showcase():
+    """Spawn a car, drone, and roaming light in front of the viewport with labels to verify movement."""
+    global _moving_actors
+    _stop_move_tick()
+    _moving_actors.clear()
+
+    cam_loc = unreal.Vector(0.0, 0.0, 200.0)
+    cam_rot = unreal.Rotator(0.0, 0.0, 0.0)
+    try:
+        loc_out = unreal.Vector()
+        rot_out = unreal.Rotator()
+        fov = 0.0
+        unreal.EditorLevelLibrary.get_level_viewport_camera_info(loc_out, rot_out, fov)
+        cam_loc = loc_out
+        cam_rot = rot_out
+    except Exception:
+        pass
+
+    forward = cam_rot.get_forward_vector()
+    right = cam_rot.get_right_vector()
+    up = unreal.Vector(0.0, 0.0, 1.0)
+    base = cam_loc + forward * 800.0 + up * 50.0
+
+    # Car
+    car_pos = base + right * -200.0
+    car_vel = unreal.Vector(400.0, 0.0, 0.0)
+    car_mat = ensure_emissive_material("M_UAT_Scifi_Car", unreal.LinearColor(0.1, 0.8, 1.0, 1.0), emissive_boost=14.0)
+    plane = unreal.EditorAssetLibrary.load_asset(PLANE_MESH_PATH)
+    _spawn_moving_actor(plane, car_mat, car_pos, car_vel, unreal.Vector(0.9, 2.8, 0.35), "Debug_Car")
+    _spawn_moving_light(car_pos + unreal.Vector(0.0, 0.0, 40.0), car_vel, 6000.0, unreal.LinearColor(0.2, 0.9, 1.0, 1.0), unreal.LinearColor(1.0, 0.3, 0.2, 1.0), hue_speed=0.8, attenuation=1200.0, label="Debug_CarLight")
+    _spawn_text_label(car_pos + unreal.Vector(0.0, 0.0, 200.0), "Car")
+
+    # Drone
+    drone_pos = base + right * 0.0 + up * 150.0
+    drone_vel = unreal.Vector(-220.0, 120.0, 60.0)
+    drone_mat = ensure_emissive_material("M_UAT_Scifi_Drone", unreal.LinearColor(0.0, 0.9, 0.8, 1.0), emissive_boost=10.0)
+    sphere = unreal.EditorAssetLibrary.load_asset(SPHERE_MESH_PATH)
+    _spawn_moving_actor(sphere, drone_mat, drone_pos, drone_vel, unreal.Vector(0.6, 0.6, 0.6), "Debug_Drone")
+    _spawn_moving_light(drone_pos + unreal.Vector(0.0, 0.0, 70.0), drone_vel, 5200.0, unreal.LinearColor(0.0, 0.9, 0.8, 1.0), unreal.LinearColor(1.0, 0.2, 0.7, 1.0), hue_speed=1.0, attenuation=900.0, label="Debug_DroneLight")
+    _spawn_text_label(drone_pos + unreal.Vector(0.0, 0.0, 200.0), "Drone")
+
+    # Roaming light
+    roam_pos = base + right * 200.0 + up * 80.0
+    roam_vel = unreal.Vector(150.0, -180.0, 40.0)
+    _spawn_moving_light(roam_pos, roam_vel, 4800.0, unreal.LinearColor(0.05, 0.8, 1.0, 1.0), unreal.LinearColor(1.0, 0.2, 0.65, 1.0), hue_speed=0.7, attenuation=1200.0, label="Debug_RoamLight")
+    _spawn_text_label(roam_pos + unreal.Vector(0.0, 0.0, 200.0), "Roaming Light")
+
+    log(f"Debug showcase spawned. Moving actors={len(_moving_actors)}")
 
 def _build_scifi_landscape_level_impl():
     towers_spawned = 0
@@ -772,6 +921,9 @@ def _build_scifi_landscape_level_impl():
         _spawn_moving_light(start + unreal.Vector(0.0, 0.0, 70.0), vel, random.uniform(5000.0, 9000.0), unreal.LinearColor(0.0, 0.9, 0.8, 1.0), unreal.LinearColor(1.0, 0.2, 0.7, 1.0), hue_speed=1.1, attenuation=900.0, label=f"DroneLight_{i}")
         if drone:
             drones_spawned += 1
+
+    # Reference showcase near origin for quick selection
+    _spawn_reference_showcase(unreal.Vector(-800.0, -2600.0, 0.0), cyan, magenta, base)
 
     total_actors = len(unreal.EditorLevelLibrary.get_all_level_actors() or [])
     log(f"Scifi build summary: towers={towers_spawned}, bridges={bridges_spawned}, highways={highways_spawned}, signs={signs_spawned}, cars={cars_spawned}, drones={drones_spawned}, moving_lights={moving_lights_spawned}, total_actors={total_actors}")
@@ -1470,6 +1622,19 @@ def main():
         delete_codex_levels()
         create_level_with_builder("Codex_Scifi_Landscape", build_scifi_landscape_level)
         log("Built Codex_Scifi_Landscape in /Game/Codex_levels")
+        snapshot_log_to_file()
+        return
+
+    if COMMAND == "debug_move_tick":
+        log(f"Move debug: handle={'set' if _move_tick_handle else 'none'}, actors={len(_moving_actors)}")
+        if _moving_actors and _move_tick_handle is None:
+            _ensure_move_tick()
+            log("Move tick re-registered")
+        snapshot_log_to_file()
+        return
+
+    if COMMAND == "spawn_debug_showcase":
+        spawn_debug_showcase()
         snapshot_log_to_file()
         return
 
