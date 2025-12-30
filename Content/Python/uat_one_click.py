@@ -67,6 +67,7 @@ _move_time_accum = 0.0
 _move_debug_counter = 0
 _MOVE_BOUNDS = unreal.Vector(3600.0, 3600.0, 1600.0)
 _MOVE_Z_MIN = 80.0
+_EXTERIOR_LIGHT_RADIUS_MIN = 2600.0
 
 def ts():
     return time.strftime("%Y%m%d_%H%M%S")
@@ -534,6 +535,34 @@ def _spawn_moving_light(start, velocity, intensity, color_a, color_b=None, hue_s
         light.set_actor_label(label)
     _push_moving(light, velocity, meta)
     return light
+
+def rotate_exterior_lights(speed_deg_per_sec=12.0, radius_min=_EXTERIOR_LIGHT_RADIUS_MIN):
+    speed_rad = math.radians(speed_deg_per_sec)
+    actors = unreal.EditorLevelLibrary.get_all_level_actors()
+    existing_moving = {entry[0] for entry in _moving_actors}
+    count = 0
+    for actor in actors:
+        if not actor or not isinstance(actor, unreal.PointLight):
+            continue
+        loc = actor.get_actor_location()
+        radius = math.sqrt(loc.x * loc.x + loc.y * loc.y)
+        if radius < radius_min:
+            continue
+        if actor in existing_moving:
+            continue
+        angle = math.atan2(loc.y, loc.x)
+        meta = {
+            "orbit": {
+                "center": unreal.Vector(0.0, 0.0, 0.0),
+                "radius": radius,
+                "height": loc.z,
+                "angle": angle,
+                "speed": speed_rad,
+            }
+        }
+        _push_moving(actor, unreal.Vector(0.0, 0.0, 0.0), meta)
+        count += 1
+    log(f"Exterior lights rotating: {count} started")
 
 def _spawn_text_label(location, text, color=unreal.LinearColor(1.0, 1.0, 1.0, 1.0), size=48.0):
     actor = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.TextRenderActor, location)
@@ -1678,22 +1707,34 @@ def _move_tick(delta_seconds):
             except Exception:
                 continue
             vel_mut = unreal.Vector(vel.x, vel.y, vel.z)
-            loc += vel_mut * delta_seconds
+            orbit = meta.get("orbit") if meta else None
+            if orbit:
+                orbit["angle"] = (orbit["angle"] + orbit["speed"] * delta_seconds) % (math.pi * 2.0)
+                angle = orbit["angle"]
+                center = orbit["center"]
+                radius = orbit["radius"]
+                loc = unreal.Vector(
+                    center.x + math.cos(angle) * radius,
+                    center.y + math.sin(angle) * radius,
+                    orbit["height"]
+                )
+            else:
+                loc += vel_mut * delta_seconds
 
-            if abs(loc.x) > _MOVE_BOUNDS.x:
-                vel_mut.x *= -1.0
-                loc.x = max(min(loc.x, _MOVE_BOUNDS.x), -_MOVE_BOUNDS.x)
-            if abs(loc.y) > _MOVE_BOUNDS.y:
-                vel_mut.y *= -1.0
-                loc.y = max(min(loc.y, _MOVE_BOUNDS.y), -_MOVE_BOUNDS.y)
-            if loc.z < _MOVE_Z_MIN or loc.z > _MOVE_BOUNDS.z:
-                vel_mut.z *= -1.0
-                loc.z = min(max(loc.z, _MOVE_Z_MIN), _MOVE_BOUNDS.z)
+                if abs(loc.x) > _MOVE_BOUNDS.x:
+                    vel_mut.x *= -1.0
+                    loc.x = max(min(loc.x, _MOVE_BOUNDS.x), -_MOVE_BOUNDS.x)
+                if abs(loc.y) > _MOVE_BOUNDS.y:
+                    vel_mut.y *= -1.0
+                    loc.y = max(min(loc.y, _MOVE_BOUNDS.y), -_MOVE_BOUNDS.y)
+                if loc.z < _MOVE_Z_MIN or loc.z > _MOVE_BOUNDS.z:
+                    vel_mut.z *= -1.0
+                    loc.z = min(max(loc.z, _MOVE_Z_MIN), _MOVE_BOUNDS.z)
 
-            if random.random() < 0.02:
-                vel_mut.x += random.uniform(-30.0, 30.0)
-                vel_mut.y += random.uniform(-30.0, 30.0)
-                vel_mut.z += random.uniform(-15.0, 15.0)
+                if random.random() < 0.02:
+                    vel_mut.x += random.uniform(-30.0, 30.0)
+                    vel_mut.y += random.uniform(-30.0, 30.0)
+                    vel_mut.z += random.uniform(-15.0, 15.0)
 
             try:
                 actor.set_actor_location(loc, sweep=False, teleport=True)
@@ -2398,6 +2439,11 @@ def main():
 
     if COMMAND == "stop_motion":
         stop_motion()
+        snapshot_log_to_file()
+        return
+
+    if COMMAND == "rotate_exterior_lights":
+        rotate_exterior_lights()
         snapshot_log_to_file()
         return
 
