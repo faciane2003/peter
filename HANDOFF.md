@@ -82,7 +82,8 @@ Log files:
   - Saved/Automation/uat_log_snapshot.txt (full snapshot)
 
 Changelog (recent):
-  - 2025-12-29: Added rotate_exterior_lights command to orbit perimeter ring lights; fixed type check using isinstance to avoid AttributeError (is_a not available).
+  - 2025-12-29: Added build_scifi_variants_20 (generates Codex_Scifi_Variant_01..20) and delete_scifi_variants (removes variants, keeps Codex_Scifi_Landscape).
+  - 2025-12-29: Added rotate_exterior_lights command for perimeter ring lights; fixed type check using isinstance to avoid AttributeError (is_a not available).
   - 2025-12-29: Added spawn_car_placeholders command to spawn moving car placeholders (Car_Placeholder_1..18).
   - 2025-12-29: Crowd spawner now assigns unique emissive glow materials (M_UAT_CrowdGlow_1..20).
   - 2025-12-29: Added fog sheet material (DepthFade) and moving fog sheets; increased fade distance to soften intersections.

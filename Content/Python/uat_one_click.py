@@ -1658,6 +1658,199 @@ def _build_scifi_landscape_level_impl():
     total_actors = len(unreal.EditorLevelLibrary.get_all_level_actors() or [])
     log(f"Scifi build summary: towers={towers_spawned}, bridges={bridges_spawned}, highways={highways_spawned}, signs={signs_spawned}, cars={cars_spawned}, drones={drones_spawned}, moving_lights={moving_lights_spawned}, total_actors={total_actors}")
 
+def _scifi_variant_styles():
+    return [
+        {"id": "V01", "seed": 101, "label": "Neon_Azure", "base": (0.05, 0.08, 0.14), "a": (0.0, 0.85, 1.0), "b": (1.0, 0.2, 0.6), "water": (0.02, 0.12, 0.2), "sun": (0.25, 0.55, 1.0), "sun_i": 4.0, "sky_i": 1.1, "fog_d": 0.05, "fog_f": 0.018},
+        {"id": "V02", "seed": 202, "label": "Amber_Rust", "base": (0.12, 0.08, 0.05), "a": (1.0, 0.55, 0.15), "b": (0.9, 0.15, 0.05), "water": (0.08, 0.05, 0.02), "sun": (1.0, 0.85, 0.6), "sun_i": 6.0, "sky_i": 0.8, "fog_d": 0.03, "fog_f": 0.012},
+        {"id": "V03", "seed": 303, "label": "Emerald_Mist", "base": (0.04, 0.09, 0.07), "a": (0.1, 0.95, 0.55), "b": (0.05, 0.65, 1.0), "water": (0.01, 0.1, 0.08), "sun": (0.6, 0.9, 0.8), "sun_i": 4.5, "sky_i": 1.0, "fog_d": 0.06, "fog_f": 0.02},
+        {"id": "V04", "seed": 404, "label": "Cold_Steel", "base": (0.12, 0.13, 0.16), "a": (0.6, 0.9, 1.0), "b": (0.2, 0.55, 0.9), "water": (0.04, 0.08, 0.12), "sun": (0.8, 0.9, 1.0), "sun_i": 5.0, "sky_i": 1.2, "fog_d": 0.04, "fog_f": 0.015},
+        {"id": "V05", "seed": 505, "label": "Crimson_Noir", "base": (0.1, 0.02, 0.03), "a": (1.0, 0.15, 0.2), "b": (1.0, 0.55, 0.05), "water": (0.05, 0.01, 0.01), "sun": (1.0, 0.4, 0.2), "sun_i": 4.2, "sky_i": 0.7, "fog_d": 0.05, "fog_f": 0.02},
+        {"id": "V06", "seed": 606, "label": "Teal_Void", "base": (0.02, 0.05, 0.08), "a": (0.0, 0.9, 0.9), "b": (0.2, 0.6, 1.0), "water": (0.01, 0.08, 0.12), "sun": (0.4, 0.75, 1.0), "sun_i": 3.8, "sky_i": 1.0, "fog_d": 0.07, "fog_f": 0.022},
+        {"id": "V07", "seed": 707, "label": "Cobalt_Arc", "base": (0.04, 0.06, 0.12), "a": (0.2, 0.45, 1.0), "b": (0.0, 0.9, 1.0), "water": (0.02, 0.05, 0.1), "sun": (0.3, 0.6, 1.0), "sun_i": 4.6, "sky_i": 1.1, "fog_d": 0.045, "fog_f": 0.017},
+        {"id": "V08", "seed": 808, "label": "Golden_Haze", "base": (0.12, 0.1, 0.05), "a": (1.0, 0.75, 0.25), "b": (0.8, 0.45, 0.1), "water": (0.08, 0.06, 0.02), "sun": (1.0, 0.9, 0.7), "sun_i": 6.5, "sky_i": 0.9, "fog_d": 0.035, "fog_f": 0.013},
+        {"id": "V09", "seed": 909, "label": "Pink_Neo", "base": (0.08, 0.03, 0.08), "a": (1.0, 0.2, 0.7), "b": (0.0, 0.85, 1.0), "water": (0.04, 0.01, 0.05), "sun": (1.0, 0.6, 0.9), "sun_i": 4.0, "sky_i": 0.9, "fog_d": 0.055, "fog_f": 0.02},
+        {"id": "V10", "seed": 1001, "label": "Saffron_Rain", "base": (0.1, 0.08, 0.03), "a": (1.0, 0.7, 0.1), "b": (0.3, 0.6, 1.0), "water": (0.06, 0.04, 0.02), "sun": (0.9, 0.8, 0.6), "sun_i": 5.2, "sky_i": 0.95, "fog_d": 0.05, "fog_f": 0.018},
+        {"id": "V11", "seed": 1101, "label": "Viridian_Grid", "base": (0.03, 0.08, 0.06), "a": (0.1, 0.9, 0.7), "b": (0.05, 0.55, 0.35), "water": (0.02, 0.08, 0.06), "sun": (0.6, 0.95, 0.85), "sun_i": 4.8, "sky_i": 1.0, "fog_d": 0.04, "fog_f": 0.015},
+        {"id": "V12", "seed": 1201, "label": "Blue_Storm", "base": (0.03, 0.04, 0.1), "a": (0.2, 0.75, 1.0), "b": (0.05, 0.35, 0.9), "water": (0.01, 0.05, 0.12), "sun": (0.4, 0.6, 1.0), "sun_i": 3.6, "sky_i": 1.2, "fog_d": 0.075, "fog_f": 0.024},
+        {"id": "V13", "seed": 1301, "label": "Lime_Signal", "base": (0.05, 0.08, 0.03), "a": (0.6, 1.0, 0.2), "b": (0.1, 0.7, 0.3), "water": (0.03, 0.06, 0.02), "sun": (0.8, 1.0, 0.7), "sun_i": 5.0, "sky_i": 0.9, "fog_d": 0.03, "fog_f": 0.012},
+        {"id": "V14", "seed": 1401, "label": "Ice_Prisma", "base": (0.08, 0.1, 0.14), "a": (0.85, 0.95, 1.0), "b": (0.3, 0.7, 1.0), "water": (0.05, 0.08, 0.12), "sun": (0.95, 0.98, 1.0), "sun_i": 5.8, "sky_i": 1.3, "fog_d": 0.04, "fog_f": 0.014},
+        {"id": "V15", "seed": 1501, "label": "Obsidian_Core", "base": (0.02, 0.02, 0.02), "a": (0.7, 0.9, 1.0), "b": (1.0, 0.35, 0.1), "water": (0.01, 0.01, 0.01), "sun": (0.6, 0.7, 0.9), "sun_i": 3.2, "sky_i": 0.6, "fog_d": 0.06, "fog_f": 0.02},
+        {"id": "V16", "seed": 1601, "label": "Sunset_Signal", "base": (0.11, 0.06, 0.04), "a": (1.0, 0.4, 0.2), "b": (1.0, 0.85, 0.35), "water": (0.06, 0.03, 0.02), "sun": (1.0, 0.6, 0.3), "sun_i": 5.5, "sky_i": 0.85, "fog_d": 0.045, "fog_f": 0.016},
+        {"id": "V17", "seed": 1701, "label": "Royal_Blue", "base": (0.04, 0.05, 0.1), "a": (0.3, 0.55, 1.0), "b": (0.1, 0.9, 0.9), "water": (0.02, 0.04, 0.1), "sun": (0.5, 0.7, 1.0), "sun_i": 4.4, "sky_i": 1.0, "fog_d": 0.05, "fog_f": 0.017},
+        {"id": "V18", "seed": 1801, "label": "Copper_Fog", "base": (0.09, 0.06, 0.04), "a": (0.9, 0.45, 0.2), "b": (0.6, 0.3, 0.1), "water": (0.05, 0.03, 0.02), "sun": (0.9, 0.7, 0.5), "sun_i": 5.0, "sky_i": 0.8, "fog_d": 0.055, "fog_f": 0.02},
+        {"id": "V19", "seed": 1901, "label": "Aqua_Noise", "base": (0.04, 0.07, 0.09), "a": (0.0, 0.9, 0.8), "b": (0.1, 0.5, 0.9), "water": (0.02, 0.08, 0.1), "sun": (0.5, 0.85, 0.95), "sun_i": 4.7, "sky_i": 1.05, "fog_d": 0.065, "fog_f": 0.021},
+        {"id": "V20", "seed": 2001, "label": "Monochrome_Cyan", "base": (0.07, 0.08, 0.09), "a": (0.4, 0.9, 1.0), "b": (0.2, 0.6, 0.8), "water": (0.04, 0.06, 0.08), "sun": (0.7, 0.9, 1.0), "sun_i": 5.0, "sky_i": 1.1, "fog_d": 0.04, "fog_f": 0.015},
+    ]
+
+def _build_scifi_variant_impl(style):
+    random.seed(style["seed"])
+
+    plane = unreal.EditorAssetLibrary.load_asset(PLANE_MESH_PATH)
+    cube = unreal.EditorAssetLibrary.load_asset(CUBE_MESH_PATH)
+    sphere = unreal.EditorAssetLibrary.load_asset(SPHERE_MESH_PATH)
+    if not plane or not cube or not sphere:
+        unreal.log_error("[UAT] Missing cube/plane/sphere mesh; aborting build_scifi_variant")
+        return
+
+    base = ensure_material(f"M_UAT_Scifi_Base_{style['id']}", unreal.LinearColor(*style["base"], 1.0))
+    accent_a = ensure_emissive_material(f"M_UAT_Scifi_A_{style['id']}", unreal.LinearColor(*style["a"], 1.0), emissive_boost=10.0)
+    accent_b = ensure_emissive_material(f"M_UAT_Scifi_B_{style['id']}", unreal.LinearColor(*style["b"], 1.0), emissive_boost=12.0)
+    water = ensure_emissive_material(f"M_UAT_Scifi_Water_{style['id']}", unreal.LinearColor(*style["water"], 1.0), emissive_boost=2.2)
+
+    add_common_lighting(unreal.LinearColor(*style["sun"], 1.0), style["sun_i"], sky_intensity=style["sky_i"])
+    make_ground(base, scale=90.0)
+
+    water_actor = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.StaticMeshActor, unreal.Vector(0.0, 0.0, -12.0))
+    wcomp = water_actor.get_component_by_class(unreal.StaticMeshComponent)
+    wcomp.set_static_mesh(plane)
+    wcomp.set_world_scale3d(unreal.Vector(82.0, 82.0, 1.0))
+    wcomp.set_material(0, water)
+    water_actor.set_actor_label("WaterPlane")
+
+    fog = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.ExponentialHeightFog, unreal.Vector(0.0, 0.0, 0.0))
+    fcomp = fog.get_component_by_class(unreal.ExponentialHeightFogComponent)
+    if fcomp:
+        fcomp.set_editor_property("fog_density", style["fog_d"])
+        fcomp.set_editor_property("fog_height_falloff", style["fog_f"])
+
+    def spawn_tower(pos, footprint, height, strips=2):
+        tower = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.StaticMeshActor, pos)
+        comp = tower.get_component_by_class(unreal.StaticMeshComponent)
+        comp.set_static_mesh(cube)
+        comp.set_material(0, base)
+        comp.set_world_scale3d(unreal.Vector(footprint.x, footprint.y, height))
+        for i in range(strips):
+            offset = (i - strips // 2) * footprint.x * 55.0
+            strip = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.StaticMeshActor, pos + unreal.Vector(offset, footprint.y * 80.0, height * 50.0))
+            scomp = strip.get_component_by_class(unreal.StaticMeshComponent)
+            scomp.set_static_mesh(cube)
+            scomp.set_material(0, accent_a if i % 2 == 0 else accent_b)
+            scomp.set_world_scale3d(unreal.Vector(0.1, 0.4, height * 2.0))
+        tower.set_actor_label(f"{style['label']}_Tower_{pos.x}_{pos.y}")
+
+    grid_range = random.randint(4, 6)
+    grid_spacing = random.uniform(480.0, 620.0)
+    for gx in range(-grid_range, grid_range + 1):
+        for gy in range(-grid_range, grid_range + 1):
+            if abs(gx) <= 1 and abs(gy) <= 1:
+                continue
+            loc = unreal.Vector(gx * grid_spacing, gy * grid_spacing, 0.0)
+            height = random.uniform(5.0, 14.0)
+            footprint = unreal.Vector(random.uniform(0.6, 1.7), random.uniform(0.6, 1.7), 1.0)
+            strips = 2 if random.random() > 0.35 else 1
+            spawn_tower(loc, footprint, height, strips=strips)
+
+    extra_towers = random.randint(18, 40)
+    for i in range(extra_towers):
+        loc = unreal.Vector(random.uniform(-3000.0, 3000.0), random.uniform(-3000.0, 3000.0), 0.0)
+        height = random.uniform(6.0, 18.0)
+        footprint = unreal.Vector(random.uniform(0.5, 1.5), random.uniform(0.5, 1.5), 1.0)
+        spawn_tower(loc, footprint, height, strips=2)
+
+    ring_radius = random.uniform(2800.0, 3400.0)
+    ring_height = random.uniform(560.0, 820.0)
+    ring_count = random.randint(12, 20)
+    for i in range(ring_count):
+        ang = (360.0 / ring_count) * i
+        rad = math.radians(ang)
+        loc = unreal.Vector(math.cos(rad) * ring_radius, math.sin(rad) * ring_radius, ring_height)
+        glow = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.PointLight, loc)
+        lcomp = glow.get_component_by_class(unreal.PointLightComponent)
+        if lcomp:
+            lcomp.set_editor_property("intensity", random.uniform(8000.0, 14000.0))
+            set_light_color_safe(lcomp, unreal.LinearColor(*style["a"], 1.0))
+
+    bridge_count = random.randint(3, 6)
+    for i in range(bridge_count):
+        yaw = random.uniform(-30.0, 30.0)
+        pos = unreal.Vector(random.uniform(-900.0, 900.0), random.uniform(-900.0, 900.0), random.uniform(480.0, 720.0))
+        scale = unreal.Vector(random.uniform(14.0, 24.0), 0.8, 0.25)
+        bridge = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.StaticMeshActor, pos)
+        comp = bridge.get_component_by_class(unreal.StaticMeshComponent)
+        comp.set_static_mesh(plane)
+        comp.set_material(0, base)
+        comp.set_world_scale3d(scale)
+        bridge.set_actor_rotation(unreal.Rotator(0.0, yaw, 0.0), teleport_physics=True)
+        strip = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.StaticMeshActor, pos + unreal.Vector(0.0, 0.0, 50.0))
+        scomp = strip.get_component_by_class(unreal.StaticMeshComponent)
+        scomp.set_static_mesh(plane)
+        scomp.set_material(0, accent_a)
+        scomp.set_world_scale3d(unreal.Vector(scale.x, 0.08, 0.1))
+
+    highway_count = random.randint(3, 5)
+    for i in range(highway_count):
+        pos = unreal.Vector(random.uniform(-1400.0, 1400.0), random.uniform(-1400.0, 1400.0), random.uniform(420.0, 620.0))
+        scale = unreal.Vector(random.uniform(18.0, 32.0), 0.9, 0.25)
+        yaw = random.uniform(-35.0, 35.0)
+        mat = accent_b if i % 2 == 0 else accent_a
+        road = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.StaticMeshActor, pos)
+        comp = road.get_component_by_class(unreal.StaticMeshComponent)
+        comp.set_static_mesh(plane)
+        comp.set_material(0, mat)
+        comp.set_world_scale3d(scale)
+        road.set_actor_rotation(unreal.Rotator(0.0, yaw, 0.0), teleport_physics=True)
+
+    sign_count = random.randint(12, 22)
+    sign_radius = random.uniform(1700.0, 2400.0)
+    sign_height = random.uniform(620.0, 780.0)
+    for i in range(sign_count):
+        ang = (360.0 / sign_count) * i
+        rad = math.radians(ang)
+        loc = unreal.Vector(math.cos(rad) * sign_radius, math.sin(rad) * sign_radius, sign_height + random.uniform(-140.0, 140.0))
+        sign_actor = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.StaticMeshActor, loc)
+        comp = sign_actor.get_component_by_class(unreal.StaticMeshComponent)
+        comp.set_static_mesh(plane)
+        comp.set_material(0, accent_b if i % 2 == 0 else accent_a)
+        comp.set_world_scale3d(unreal.Vector(random.uniform(1.4, 3.2), 0.35, 1.0))
+        sign_actor.set_actor_rotation(unreal.Rotator(0.0, ang + 90.0, random.uniform(-6.0, 6.0)), teleport_physics=True)
+        sign_light = unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.PointLight, loc + unreal.Vector(0.0, 0.0, 150.0))
+        lcomp = sign_light.get_component_by_class(unreal.PointLightComponent)
+        if lcomp:
+            lcomp.set_editor_property("intensity", random.uniform(8000.0, 11000.0))
+            set_light_color_safe(lcomp, unreal.LinearColor(*style["b"], 1.0))
+
+    moving_lights = random.randint(12, 22)
+    for i in range(moving_lights):
+        start = unreal.Vector(random.uniform(-1800.0, 1800.0), random.uniform(-1800.0, 1800.0), random.uniform(260.0, 980.0))
+        vel = unreal.Vector(random.uniform(-260.0, 260.0), random.uniform(-260.0, 260.0), random.uniform(-120.0, 120.0))
+        _spawn_moving_light(start, vel, random.uniform(5500.0, 9800.0), unreal.LinearColor(*style["a"], 1.0), unreal.LinearColor(*style["b"], 1.0), hue_speed=0.6, attenuation=1600.0, label=f"{style['label']}_MovingLight_{i}")
+
+    car_mat = ensure_emissive_material(f"M_UAT_Scifi_Car_{style['id']}", unreal.LinearColor(*style["a"], 1.0), emissive_boost=12.0)
+    car_count = random.randint(18, 35)
+    for i in range(car_count):
+        start = unreal.Vector(-3600.0, random.uniform(-1800.0, 1800.0), random.uniform(320.0, 1200.0))
+        vel = unreal.Vector(random.uniform(650.0, 1150.0), random.uniform(-180.0, 180.0), random.uniform(-80.0, 80.0))
+        _spawn_moving_actor(plane, car_mat, start, vel, unreal.Vector(0.9, 2.6, 0.35), f"{style['label']}_Car_{i}")
+
+    drone_mat = ensure_emissive_material(f"M_UAT_Scifi_Drone_{style['id']}", unreal.LinearColor(*style["b"], 1.0), emissive_boost=10.0)
+    drone_count = random.randint(12, 26)
+    for i in range(drone_count):
+        start = unreal.Vector(random.uniform(-2200.0, 2200.0), random.uniform(-2200.0, 2200.0), random.uniform(520.0, 1400.0))
+        vel = unreal.Vector(random.uniform(-260.0, 260.0), random.uniform(-260.0, 260.0), random.uniform(-90.0, 90.0))
+        _spawn_moving_actor(sphere, drone_mat, start, vel, unreal.Vector(0.5, 0.5, 0.5), f"{style['label']}_Drone_{i}")
+
+def build_scifi_variants_20():
+    log("Scifi variants: start")
+    styles = _scifi_variant_styles()
+    make_directory(CODEX_LEVEL_DIR)
+    for idx, style in enumerate(styles, start=1):
+        level_name = f"Codex_Scifi_Variant_{idx:02d}"
+        log(f"Building {level_name} ({style['label']})")
+        create_level_with_builder(level_name, lambda s=style: _build_scifi_variant_impl(s))
+    log("Scifi variants: complete")
+
+def delete_scifi_variants():
+    if not unreal.EditorAssetLibrary.does_directory_exist(CODEX_LEVEL_DIR):
+        log("Codex levels directory missing; nothing to delete.")
+        return
+    assets = unreal.EditorAssetLibrary.list_assets(CODEX_LEVEL_DIR, recursive=True, include_folder=False)
+    deleted = 0
+    for asset in assets:
+        if "/Codex_Scifi_Variant_" in asset:
+            if unreal.EditorAssetLibrary.delete_asset(asset):
+                deleted += 1
+    log(f"Deleted scifi variants: {deleted}")
+
 def _stop_rotate_tick():
     global _rotate_tick_handle
     if _rotate_tick_handle is not None:
@@ -2421,6 +2614,18 @@ def main():
         delete_codex_levels()
         create_level_with_builder("Codex_Scifi_Landscape", build_scifi_landscape_level)
         log("Built Codex_Scifi_Landscape in /Game/Codex_levels")
+        snapshot_log_to_file()
+        return
+
+    if COMMAND == "build_scifi_variants_20":
+        write_log_marker("build_scifi_variants_20 start")
+        build_scifi_variants_20()
+        snapshot_log_to_file()
+        return
+
+    if COMMAND == "delete_scifi_variants":
+        write_log_marker("delete_scifi_variants start")
+        delete_scifi_variants()
         snapshot_log_to_file()
         return
 
